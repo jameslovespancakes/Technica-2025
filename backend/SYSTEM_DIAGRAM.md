@@ -541,3 +541,340 @@ Request
 - Mock vs Real mode
 - File cleanup state
 
+---
+
+## Pending Implementation (Not Yet Built)
+
+### Phase 4: Gemini API Integration ⏳
+
+```
+┌─────────────────────────────────────────────────────────┐
+│         CURRENT: Analysis Returns YOLOv8 Results        │
+└──────────────────────┬──────────────────────────────────┘
+                       │
+                       ▼
+┌─────────────────────────────────────────────────────────┐
+│              TO BE IMPLEMENTED                          │
+│                                                         │
+│  ┌─────────────────────────────────────┐              │
+│  │ services/gemini_service.py           │              │
+│  │                                      │              │
+│  │ Functions Needed:                    │              │
+│  │ • get_explanation(yolo_results)      │              │
+│  │ • format_prompt_for_gemini()         │              │
+│  │ • call_gemini_api(prompt)            │              │
+│  │ • parse_gemini_response()            │              │
+│  └──────────────────┬───────────────────┘              │
+│                     │                                   │
+│                     ▼                                   │
+│  ┌─────────────────────────────────────┐              │
+│  │ Gemini API Integration              │              │
+│  │                                      │              │
+│  │ Input:                               │              │
+│  │ • Rash label (from YOLOv8)          │              │
+│  │ • Confidence score                   │              │
+│  │ • Request for explanation            │              │
+│  │                                      │              │
+│  │ Process:                             │              │
+│  │ • Format prompt                      │              │
+│  │ • Send to Gemini API                │              │
+│  │ • Handle API errors                 │              │
+│  │ • Parse response                     │              │
+│  │                                      │              │
+│  │ Output:                              │              │
+│  │ • AI-generated explanation          │              │
+│  │ • Context about condition           │              │
+│  │ • Recommendations                   │              │
+│  └─────────────────────────────────────┘              │
+│                                                         │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Missing Components:**
+- `services/gemini_service.py` - Gemini API client
+- Environment variable for API key (`.env` file)
+- Prompt formatting logic
+- Error handling for API failures
+- Response parsing
+
+**Expected Flow:**
+```
+YOLOv8 Detection → Format Results → Gemini API → Parse Response → Return Combined
+```
+
+---
+
+### Phase 5: End-to-End Integration ⏳
+
+```
+┌─────────────────────────────────────────────────────────┐
+│         CURRENT: Separate Upload & Analyze              │
+└──────────────────────┬──────────────────────────────────┘
+                       │
+                       ▼
+┌─────────────────────────────────────────────────────────┐
+│              TO BE IMPLEMENTED                          │
+│                                                         │
+│  Complete Workflow:                                      │
+│                                                         │
+│  ┌─────────────────────────────────────┐              │
+│  │ POST /upload                        │              │
+│  │   │                                 │              │
+│  │   ├─► Save Image                   │              │
+│  │   │                                 │              │
+│  │   ├─► Run YOLOv8 Detection         │              │
+│  │   │   └─► Get rash label,          │              │
+│  │   │       confidence, bbox         │              │
+│  │   │                                 │              │
+│  │   ├─► Send to Gemini API          │              │
+│  │   │   └─► Get explanation          │              │
+│  │   │                                 │              │
+│  │   ├─► Combine All Results          │              │
+│  │   │                                 │              │
+│  │   └─► Return Single JSON Response  │              │
+│  │       {                             │              │
+│  │         "rash_label": "...",        │              │
+│  │         "confidence": 85.5,        │              │
+│  │         "bounding_box": {...},      │              │
+│  │         "ai_explanation": "..."    │              │
+│  │       }                             │              │
+│  └─────────────────────────────────────┘              │
+│                                                         │
+│  OR                                                     │
+│                                                         │
+│  ┌─────────────────────────────────────┐              │
+│  │ Enhanced POST /analyze              │              │
+│  │   │                                 │              │
+│  │   ├─► YOLOv8 Detection             │              │
+│  │   ├─► Gemini Explanation            │              │
+│  │   └─► Combined Response            │              │
+│  └─────────────────────────────────────┘              │
+│                                                         │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Missing Components:**
+- Integration of Gemini service into analyze endpoint
+- Combined response format
+- Error handling for partial failures (YOLO works, Gemini fails)
+- File cleanup after analysis completion
+
+**Expected Response Format:**
+```json
+{
+  "success": true,
+  "rash_label": "eczema",
+  "confidence": 85.5,
+  "bounding_box": {
+    "x": 100,
+    "y": 150,
+    "width": 200,
+    "height": 180
+  },
+  "ai_explanation": "Eczema is a common skin condition...",
+  "recommendations": ["Keep skin moisturized", "Avoid triggers"],
+  "model_loaded": true
+}
+```
+
+---
+
+### Phase 6: Production Readiness ⏳
+
+```
+┌─────────────────────────────────────────────────────────┐
+│              TO BE IMPLEMENTED                          │
+│                                                         │
+│  ┌─────────────────────────────────────┐              │
+│  │ Configuration Management            │              │
+│  │                                      │              │
+│  │ • config.py                         │              │
+│  │ • .env file support                 │              │
+│  │ • Environment variables:            │              │
+│  │   - GEMINI_API_KEY                 │              │
+│  │   - MODEL_PATH                     │              │
+│  │   - FLASK_ENV                      │              │
+│  │   - UPLOAD_FOLDER                 │              │
+│  └─────────────────────────────────────┘              │
+│                                                         │
+│  ┌─────────────────────────────────────┐              │
+│  │ Logging System                      │              │
+│  │                                      │              │
+│  │ • Request logging                   │              │
+│  │ • Error logging                      │              │
+│  │ • Performance logging                │              │
+│  │ • Log file rotation                 │              │
+│  └─────────────────────────────────────┘              │
+│                                                         │
+│  ┌─────────────────────────────────────┐              │
+│  │ Rate Limiting                       │              │
+│  │                                      │              │
+│  │ • Prevent API abuse                 │              │
+│  │ • Limit requests per IP              │              │
+│  │ • Limit requests per endpoint       │              │
+│  └─────────────────────────────────────┘              │
+│                                                         │
+│  ┌─────────────────────────────────────┐              │
+│  │ API Documentation                   │              │
+│  │                                      │              │
+│  │ • Swagger/OpenAPI docs               │              │
+│  │ • Endpoint documentation             │              │
+│  │ • Request/response examples          │              │
+│  └─────────────────────────────────────┘              │
+│                                                         │
+│  ┌─────────────────────────────────────┐              │
+│  │ Testing                             │              │
+│  │                                      │              │
+│  │ • Unit tests                        │              │
+│  │ • Integration tests                 │              │
+│  │ • End-to-end tests                  │              │
+│  └─────────────────────────────────────┘              │
+│                                                         │
+│  ┌─────────────────────────────────────┐              │
+│  │ Deployment Configuration            │              │
+│  │                                      │              │
+│  │ • Production server (Gunicorn)      │              │
+│  │ • CORS restrictions                 │              │
+│  │ • Error message sanitization        │              │
+│  │ • Debug mode disabled               │              │
+│  └─────────────────────────────────────┘              │
+│                                                         │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Missing Components:**
+- `config.py` - Centralized configuration
+- `.env` file - Environment variables
+- Logging configuration
+- Rate limiting middleware
+- API documentation (Swagger)
+- Unit tests
+- Production server setup
+
+---
+
+## Implementation Status
+
+### ✅ Completed (Phase 1-3)
+
+- [x] Flask application setup
+- [x] CORS configuration
+- [x] Image upload endpoint (`POST /upload`)
+- [x] File validation (extension, size, content type)
+- [x] File cleanup utility
+- [x] YOLOv8 service structure
+- [x] Model loading (with mock mode)
+- [x] Analysis endpoint (`POST /analyze`)
+- [x] Model info endpoint (`GET /model/info`)
+- [x] Cleanup endpoint (`POST /cleanup`)
+- [x] Health check endpoint (`GET /health`)
+- [x] Error handling
+- [x] System documentation
+
+### ⏳ Pending (Phase 4-6)
+
+**Phase 4: Gemini API Integration**
+- [ ] Create `services/gemini_service.py`
+- [ ] Set up Gemini API client
+- [ ] Format YOLOv8 results for Gemini prompt
+- [ ] Call Gemini API
+- [ ] Parse Gemini response
+- [ ] Handle API errors
+- [ ] Add API key to `.env`
+
+**Phase 5: End-to-End Integration**
+- [ ] Integrate Gemini into analyze endpoint
+- [ ] Combine YOLOv8 + Gemini results
+- [ ] Update response format
+- [ ] Handle partial failures
+- [ ] File cleanup after analysis
+- [ ] Test complete workflow
+
+**Phase 6: Production Readiness**
+- [ ] Create `config.py` for configuration
+- [ ] Add `.env` file support
+- [ ] Implement logging system
+- [ ] Add rate limiting
+- [ ] Create API documentation
+- [ ] Write unit tests
+- [ ] Set up production server
+- [ ] Configure CORS for production
+- [ ] Sanitize error messages
+
+---
+
+## Future System Flow (Complete Implementation)
+
+```
+User Uploads Image
+   │
+   ▼
+POST /upload
+   │
+   ├─► Validate & Save Image
+   │
+   ├─► Run YOLOv8 Detection
+   │   └─► Get: label, confidence, bbox
+   │
+   ├─► Send to Gemini API
+   │   └─► Get: explanation, recommendations
+   │
+   ├─► Combine All Results
+   │
+   ├─► Clean Up Temporary File
+   │
+   └─► Return Complete JSON:
+       {
+         "rash_label": "...",
+         "confidence": 85.5,
+         "bounding_box": {...},
+         "ai_explanation": "...",
+         "recommendations": [...]
+       }
+```
+
+---
+
+## Missing Endpoints (Future)
+
+### **Enhanced Analyze Endpoint**
+- `POST /analyze` - Will include Gemini explanation in response
+
+### **Potential New Endpoints**
+- `GET /api/docs` - API documentation (Swagger)
+- `POST /api/health/detailed` - Detailed health check with model status
+- `GET /api/stats` - Usage statistics (if needed)
+
+---
+
+## Dependencies Needed
+
+### **For Gemini Integration:**
+- ✅ `google-generativeai` - Already in requirements.txt
+- ⏳ Gemini API key - Need to obtain
+- ⏳ `.env` file - Need to create
+
+### **For Production:**
+- ⏳ `gunicorn` - Production server
+- ⏳ `python-dotenv` - Environment variable loading
+- ⏳ `flask-limiter` - Rate limiting (optional)
+- ⏳ `flasgger` or `flask-restx` - API documentation (optional)
+
+---
+
+## Next Steps Priority
+
+1. **High Priority:**
+   - Gemini API integration (Phase 4)
+   - End-to-end workflow (Phase 5)
+
+2. **Medium Priority:**
+   - Configuration management
+   - Logging system
+
+3. **Low Priority:**
+   - Rate limiting
+   - API documentation
+   - Unit tests
+   - Production deployment
+
