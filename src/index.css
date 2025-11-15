@@ -1,0 +1,55 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.lab-bg::before {
+  overflow: hidden;
+  max-width: 100vw;
+  max-height: 100vh;
+  box-sizing: border-box;
+}
+
+:root {
+  --background: oklch(0 0 0);
+  --foreground: oklch(1 0 0);
+  --card: oklch(0.1 0 0 / 0.1);
+  --card-foreground: oklch(1 0 0);
+  --popover: oklch(0 0 0 / 0.8);
+  --popover-foreground: oklch(1 0 0);
+  --primary: oklch(1 0 0);
+  --primary-foreground: oklch(0 0 0);
+  --secondary: oklch(0.65 0 0);
+  --secondary-foreground: oklch(1 0 0);
+  --muted: oklch(1 0 0 / 0.5);
+  --muted-foreground: oklch(0.7 0 0);
+  --accent: oklch(0.65 0 0);
+  --accent-foreground: oklch(1 0 0);
+  --destructive: oklch(0.6 0.15 25);
+  --destructive-foreground: oklch(1 0 0);
+  --border: oklch(1 0 0 / 0.2);
+  --input: oklch(1 0 0 / 0.1);
+  --ring: oklch(1 0 0 / 0.3);
+}
+
+.dark {
+  --background: oklch(0 0 0);
+  --foreground: oklch(1 0 0);
+  --card: oklch(0.1 0 0 / 0.1);
+  --card-foreground: oklch(1 0 0);
+  --popover: oklch(0 0 0 / 0.8);
+  --popover-foreground: oklch(1 0 0);
+  --primary: oklch(1 0 0);
+  --primary-foreground: oklch(0 0 0);
+  --secondary: oklch(0.65 0 0);
+  --secondary-foreground: oklch(1 0 0);
+  --muted: oklch(1 0 0 / 0.5);
+  --muted-foreground: oklch(0.7 0 0);
+  --accent: oklch(0.65 0 0);
+  --accent-foreground: oklch(1 0 0);
+  --destructive: oklch(0.6 0.15 25);
+  --destructive-foreground: oklch(1 0 0);
+  --border: oklch(1 0 0 / 0.2);
+  --input: oklch(1 0 0 / 0.1);
+  --ring: oklch(1 0 0 / 0.3);
+}
+
