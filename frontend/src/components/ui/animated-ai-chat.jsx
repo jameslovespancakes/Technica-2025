@@ -290,11 +290,22 @@ export function AnimatedAIChat({ onMessageSend, onImageUpload }) {
             >
 
                 <motion.div 
-                    className="relative backdrop-blur-2xl bg-white/[0.02] rounded-2xl border border-white/[0.1] shadow-2xl"
+                    className="relative rounded-2xl bg-black border border-white/30 overflow-hidden"
+                    style={{
+                        boxShadow: `0 0 12px rgba(255, 255, 255, 0.2), 0 0 24px rgba(255, 255, 255, 0.1)`,
+                    }}
                     initial={{ scale: 0.98 }}
                     animate={{ scale: 1 }}
                     transition={{ delay: 0.1 }}
                 >
+                    {/* Subtle backlighting */}
+                    <div 
+                        className="absolute inset-0 rounded-2xl pointer-events-none"
+                        style={{
+                            background: `radial-gradient(circle at center, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 40%, transparent 70%)`,
+                        }}
+                    />
+                    <div className="relative z-10">
                     <AnimatePresence>
                         {showCommandPalette && (
                             <motion.div 
@@ -412,13 +423,19 @@ export function AnimatedAIChat({ onMessageSend, onImageUpload }) {
                                 type="button"
                                 onClick={handleAttachFile}
                                 whileTap={{ scale: 0.94 }}
-                                className="p-2 text-white/40 hover:text-white/90 rounded-lg transition-colors relative group"
+                                className="p-2 text-white rounded-lg relative group bg-black border border-white/30"
+                                style={{
+                                    boxShadow: `0 0 8px rgba(255, 255, 255, 0.15), 0 0 16px rgba(255, 255, 255, 0.08)`,
+                                }}
                             >
-                                <Paperclip className="w-4 h-4" />
-                                <motion.span
-                                    className="absolute inset-0 bg-white/[0.05] rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
-                                    layoutId="button-highlight"
+                                {/* Subtle backlighting */}
+                                <div 
+                                    className="absolute inset-0 rounded-lg pointer-events-none"
+                                    style={{
+                                        background: `radial-gradient(circle at center, rgba(255, 255, 255, 0.08) 0%, transparent 60%)`,
+                                    }}
                                 />
+                                <Paperclip className="w-4 h-4 relative z-10" />
                             </motion.button>
                             <motion.button
                                 type="button"
@@ -429,15 +446,23 @@ export function AnimatedAIChat({ onMessageSend, onImageUpload }) {
                                 }}
                                 whileTap={{ scale: 0.94 }}
                                 className={cn(
-                                    "p-2 text-white/40 hover:text-white/90 rounded-lg transition-colors relative group",
-                                    showCommandPalette && "bg-white/10 text-white/90"
+                                    "p-2 text-white rounded-lg relative group bg-black border border-white/30",
+                                    showCommandPalette && "border-white/50"
                                 )}
+                                style={{
+                                    boxShadow: showCommandPalette 
+                                        ? `0 0 12px rgba(255, 255, 255, 0.25), 0 0 24px rgba(255, 255, 255, 0.12)`
+                                        : `0 0 8px rgba(255, 255, 255, 0.15), 0 0 16px rgba(255, 255, 255, 0.08)`,
+                                }}
                             >
-                                <Command className="w-4 h-4" />
-                                <motion.span
-                                    className="absolute inset-0 bg-white/[0.05] rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
-                                    layoutId="button-highlight"
+                                {/* Subtle backlighting */}
+                                <div 
+                                    className="absolute inset-0 rounded-lg pointer-events-none"
+                                    style={{
+                                        background: `radial-gradient(circle at center, rgba(255, 255, 255, 0.08) 0%, transparent 60%)`,
+                                    }}
                                 />
+                                <Command className="w-4 h-4 relative z-10" />
                             </motion.button>
                         </div>
                         
@@ -448,20 +473,35 @@ export function AnimatedAIChat({ onMessageSend, onImageUpload }) {
                             whileTap={{ scale: 0.98 }}
                             disabled={isTyping || (!value.trim() && uploadedImages.length === 0)}
                             className={cn(
-                                "px-4 py-2 rounded-lg text-sm font-medium transition-all",
+                                "px-4 py-2 rounded-lg text-sm font-medium transition-all relative",
                                 "flex items-center gap-2",
                                 (value.trim() || uploadedImages.length > 0)
-                                    ? "bg-white/10 hover:bg-white/20 border border-white/20 text-white shadow-lg shadow-white/5"
-                                    : "bg-white/[0.05] text-white/40"
+                                    ? "bg-black border border-white/30 text-white"
+                                    : "bg-black/50 border border-white/20 text-white/40"
                             )}
+                            style={{
+                                boxShadow: (value.trim() || uploadedImages.length > 0)
+                                    ? `0 0 12px rgba(255, 255, 255, 0.2), 0 0 24px rgba(255, 255, 255, 0.1)`
+                                    : `0 0 6px rgba(255, 255, 255, 0.1), 0 0 12px rgba(255, 255, 255, 0.05)`,
+                            }}
                         >
-                            {isTyping ? (
-                                <LoaderIcon className="w-4 h-4 animate-[spin_2s_linear_infinite]" />
-                            ) : (
-                                <SendIcon className="w-4 h-4" />
+                            {/* Subtle backlighting */}
+                            {(value.trim() || uploadedImages.length > 0) && (
+                                <div 
+                                    className="absolute inset-0 rounded-lg pointer-events-none"
+                                    style={{
+                                        background: `radial-gradient(circle at center, rgba(255, 255, 255, 0.1) 0%, transparent 60%)`,
+                                    }}
+                                />
                             )}
-                            <span>Send</span>
+                            {isTyping ? (
+                                <LoaderIcon className="w-4 h-4 animate-[spin_2s_linear_infinite] relative z-10" />
+                            ) : (
+                                <SendIcon className="w-4 h-4 relative z-10" />
+                            )}
+                            <span className="relative z-10">Send</span>
                         </motion.button>
+                    </div>
                     </div>
                 </motion.div>
 
@@ -470,31 +510,52 @@ export function AnimatedAIChat({ onMessageSend, onImageUpload }) {
                         <motion.button
                             key={suggestion.prefix}
                             onClick={() => selectCommandSuggestion(index)}
-                            className="flex items-center gap-2 px-3 py-2 bg-white/[0.02] hover:bg-white/[0.05] rounded-lg text-sm text-white/60 hover:text-white/90 transition-all relative group"
+                            className="flex items-center gap-2 px-3 py-2 bg-black border border-white/30 rounded-lg text-sm text-white transition-all relative group"
+                            style={{
+                                boxShadow: `0 0 8px rgba(255, 255, 255, 0.15), 0 0 16px rgba(255, 255, 255, 0.08)`,
+                            }}
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: index * 0.1 }}
                         >
-                            {suggestion.icon}
-                            <span>{suggestion.label}</span>
+                            {/* Subtle backlighting */}
+                            <div 
+                                className="absolute inset-0 rounded-lg pointer-events-none"
+                                style={{
+                                    background: `radial-gradient(circle at center, rgba(255, 255, 255, 0.08) 0%, transparent 60%)`,
+                                }}
+                            />
+                            <span className="relative z-10">{suggestion.icon}</span>
+                            <span className="relative z-10">{suggestion.label}</span>
                         </motion.button>
                     ))}
                 </div>
             </motion.div>
 
+            {/* AI Analyzing Indicator - positioned at bottom center of page, aligned with buttons */}
             <AnimatePresence>
                 {isTyping && (
                     <motion.div 
-                        className="fixed bottom-8 left-1/2 transform -translate-x-1/2 backdrop-blur-2xl bg-white/[0.02] rounded-full px-4 py-2 shadow-lg border border-white/[0.05]"
-                        initial={{ opacity: 0, y: 20 }}
+                        className="fixed bottom-8 left-1/2 transform -translate-x-1/2 rounded-lg px-3 py-1.5 relative bg-black border border-white/30 z-50"
+                        style={{
+                            boxShadow: `0 0 12px rgba(255, 255, 255, 0.2), 0 0 24px rgba(255, 255, 255, 0.1)`,
+                        }}
+                        initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: 20 }}
+                        exit={{ opacity: 0, y: 10 }}
                     >
-                        <div className="flex items-center gap-3">
-                            <div className="w-8 h-7 rounded-full bg-white/[0.05] flex items-center justify-center text-center">
-                                <span className="text-xs font-medium text-white/90 mb-0.5">AI</span>
+                        {/* Subtle backlighting */}
+                        <div 
+                            className="absolute inset-0 rounded-lg pointer-events-none"
+                            style={{
+                                background: `radial-gradient(circle at center, rgba(255, 255, 255, 0.1) 0%, transparent 60%)`,
+                            }}
+                        />
+                        <div className="flex items-center gap-2 relative z-10">
+                            <div className="w-5 h-5 rounded-full bg-white/[0.05] flex items-center justify-center">
+                                <span className="text-[10px] font-medium text-white">AI</span>
                             </div>
-                            <div className="flex items-center gap-2 text-sm text-white/70">
+                            <div className="flex items-center gap-1.5 text-xs text-white/90">
                                 <span>Analyzing</span>
                                 <TypingDots />
                             </div>

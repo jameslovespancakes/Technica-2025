@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useMemo, useRef } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
@@ -6,7 +8,7 @@ import { cn } from "@/lib/utils";
 export const CanvasRevealEffect = ({
   animationSpeed = 10,
   opacities = [0.3, 0.3, 0.3, 0.5, 0.5, 0.5, 0.8, 0.8, 0.8, 1],
-  colors = [[255, 255, 255]],
+  colors = [[0, 255, 255]],
   containerClassName,
   dotSize,
   showGradient = true,
@@ -16,7 +18,7 @@ export const CanvasRevealEffect = ({
     <div className={cn("h-full relative w-full", containerClassName)}>
       <div className="h-full w-full">
         <DotMatrix
-          colors={colors ?? [[255, 255, 255]]}
+          colors={colors ?? [[0, 255, 255]]}
           dotSize={dotSize ?? 3}
           opacities={
             opacities ?? [0.3, 0.3, 0.3, 0.5, 0.5, 0.5, 0.8, 0.8, 0.8, 1]
@@ -36,14 +38,14 @@ export const CanvasRevealEffect = ({
 };
 
 const DotMatrix = ({
-  colors = [[255, 255, 255]],
+  colors = [[0, 0, 0]],
   opacities = [0.04, 0.04, 0.04, 0.04, 0.04, 0.08, 0.08, 0.08, 0.08, 0.14],
   totalSize = 20,
   dotSize = 2,
   shader = "",
   center = ["x", "y"],
 }) => {
-  const uniforms = useMemo(() => {
+  const uniforms = React.useMemo(() => {
     let colorsArray = [
       colors[0],
       colors[0],
@@ -162,12 +164,12 @@ const DotMatrix = ({
             float current_timing_offset;
             if (u_reverse == 1) {
                 current_timing_offset = timing_offset_outro;
-                 opacity *= 1.0 - step(current_timing_offset, u_time * animation_speed_factor);
-                 opacity *= clamp((step(current_timing_offset + 0.1, u_time * animation_speed_factor)) * 1.25, 1.0, 1.25);
+                opacity *= 1.0 - step(current_timing_offset, u_time * animation_speed_factor);
+                opacity *= clamp((step(current_timing_offset + 0.1, u_time * animation_speed_factor)) * 1.25, 1.0, 1.25);
             } else {
                 current_timing_offset = timing_offset_intro;
-                 opacity *= step(current_timing_offset, u_time * animation_speed_factor);
-                 opacity *= clamp((1.0 - step(current_timing_offset + 0.1, u_time * animation_speed_factor)) * 1.25, 1.0, 1.25);
+                opacity *= step(current_timing_offset, u_time * animation_speed_factor);
+                opacity *= clamp((1.0 - step(current_timing_offset + 0.1, u_time * animation_speed_factor)) * 1.25, 1.0, 1.25);
             }
 
             fragColor = vec4(color, opacity);
@@ -186,10 +188,12 @@ const ShaderMaterial = ({
 }) => {
   const { size } = useThree();
   const ref = useRef(null);
+  let lastFrameTime = 0;
 
   useFrame(({ clock }) => {
     if (!ref.current) return;
     const timestamp = clock.getElapsedTime();
+    lastFrameTime = timestamp;
     const material = ref.current.material;
     const timeLocation = material.uniforms.u_time;
     timeLocation.value = timestamp;
@@ -285,4 +289,3 @@ const Shader = ({ source, uniforms, maxFps = 60 }) => {
     </Canvas>
   );
 };
-

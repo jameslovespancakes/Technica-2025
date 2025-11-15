@@ -165,42 +165,34 @@ export default function RadialOrbitalTimeline({
                 }}
               >
                 <div
-                  className={`absolute rounded-full ${
-                    isPulsing ? "animate-pulse duration-1000" : ""
-                  }`}
+                  className="relative rounded-full bg-black border border-white/30 flex items-center justify-center"
                   style={{
-                    background: `radial-gradient(circle, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0) 70%)`,
                     width: '72px',
                     height: '72px',
-                    left: '0px',
-                    top: '0px',
+                    boxShadow: isExpanded
+                      ? `0 0 20px rgba(255, 255, 255, 0.4), 0 0 40px rgba(255, 255, 255, 0.2)`
+                      : isRelated
+                      ? `0 0 15px rgba(255, 255, 255, 0.3), 0 0 30px rgba(255, 255, 255, 0.15)`
+                      : `0 0 12px rgba(255, 255, 255, 0.2), 0 0 24px rgba(255, 255, 255, 0.1)`,
+                    transition: 'box-shadow 0.3s ease-out, transform 0.3s ease-out',
+                    transform: isExpanded ? 'scale(1.5)' : isPulsing ? 'scale(1.05)' : 'scale(1)',
                   }}
-                ></div>
-
-                <div
-                  className={`
-                  rounded-full flex items-center justify-center
-                  ${
-                    isExpanded
-                      ? "bg-white text-black"
-                      : isRelated
-                      ? "bg-white/50 text-black"
-                      : "bg-black text-white"
-                  }
-                  border-2 
-                  ${
-                    isExpanded
-                      ? "border-white shadow-lg shadow-white/30"
-                      : isRelated
-                      ? "border-white animate-pulse"
-                      : "border-white/40"
-                  }
-                  transition-all duration-300 transform
-                  ${isExpanded ? "scale-150" : ""}
-                `}
-                  style={{ width: '72px', height: '72px' }}
                 >
-                  <Icon size={30} />
+                  {/* Subtle backlighting */}
+                  <div 
+                    className="absolute inset-0 rounded-full pointer-events-none"
+                    style={{
+                      background: `radial-gradient(circle at center, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 40%, transparent 70%)`,
+                    }}
+                  />
+
+                  {/* Icon container */}
+                  <div className="relative z-10 w-full h-full flex items-center justify-center">
+                    <Icon 
+                      size={30} 
+                      className={`text-white ${isPulsing && !isExpanded ? "animate-pulse" : ""}`} 
+                    />
+                  </div>
                 </div>
 
                 <div

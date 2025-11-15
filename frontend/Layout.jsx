@@ -2,7 +2,7 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { Button } from "@/components/ui/button";
-import { BackgroundBeams } from "@/components/ui/background-beams";
+import { CanvasRevealEffect } from "@/components/ui/canvas-reveal-effect";
 import { SpotlightCursor } from "@/components/ui/spotlight-cursor";
 import { PillBase } from "@/components/ui/3d-adaptive-navigation-bar";
 
@@ -10,9 +10,21 @@ import { PillBase } from "@/components/ui/3d-adaptive-navigation-bar";
 export default function Layout({ children }) {
   return (
     <div className="min-h-screen bg-black text-white w-full h-full relative">
-      {/* Background Beams */}
+      {/* Canvas Reveal Effect Background */}
       <div className="fixed inset-0 z-0">
-        <BackgroundBeams className="bg-black" />
+        <CanvasRevealEffect
+          animationSpeed={3}
+          containerClassName="bg-black"
+          colors={[
+            [255, 255, 255],
+            [255, 255, 255],
+          ]}
+          dotSize={6}
+          reverse={false}
+          showGradient={true}
+        />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(0,0,0,1)_0%,_transparent_100%)]" />
+        <div className="absolute top-0 left-0 right-0 h-1/3 bg-gradient-to-b from-black to-transparent" />
       </div>
       <SpotlightCursor config={{ radius: 300, brightness: 0.08, color: '#ffffff' }} />
       <style>{`
@@ -44,7 +56,7 @@ export default function Layout({ children }) {
       `}</style>
 
       {/* Top Navigation Bar */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-black/95 backdrop-blur-md">
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-transparent">
         <div className="relative w-full px-6 py-4 flex items-center">
           {/* Mobile Navigation - CTA Button - Top Right */}
           <div className="ml-auto md:hidden z-10">

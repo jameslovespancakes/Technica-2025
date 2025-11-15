@@ -119,11 +119,37 @@ export default function Analysis() {
       <div className="max-w-5xl mx-auto relative z-10">
         {/* Header */}
         <div className="text-center mb-8 pt-32 md:pt-40">
-          <h1 className="text-4xl md:text-5xl font-bold mb-4">
+          <h1 
+            className="text-4xl md:text-5xl font-bold mb-4 pb-2 leading-tight bg-clip-text text-transparent bg-gradient-to-r from-gray-500 via-gray-200 to-gray-600 bg-[length:200%_auto] animate-shimmer"
+            style={{
+              backgroundSize: '200% auto',
+              animation: 'shimmer 3s ease-in-out infinite',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text',
+            }}
+          >
             Skin Analysis
           </h1>
-          <p className="text-gray-400 text-lg">
+          <style>{`
+            @keyframes shimmer {
+              0% {
+                background-position: 0% center;
+              }
+              50% {
+                background-position: 100% center;
+              }
+              100% {
+                background-position: 0% center;
+              }
+            }
+          `}</style>
+          <p className="text-gray-400 text-lg mb-2">
             Upload a clear photo of your skin condition for instant AI-powered analysis
+          </p>
+          {/* Medical Disclaimer */}
+          <p className="text-xs text-gray-500 text-center">
+            <strong className="text-gray-400">Medical Disclaimer:</strong> This tool is for informational purposes only and is not a substitute for professional medical advice, diagnosis, or treatment.
           </p>
         </div>
 
@@ -135,11 +161,6 @@ export default function Analysis() {
               onMessageSend={handleMessageSend}
               onImageUpload={handleImageUpload}
             />
-
-            {/* Medical Disclaimer */}
-            <p className="text-xs text-gray-500 text-center">
-              <strong className="text-gray-400">Medical Disclaimer:</strong> This tool is for informational purposes only and is not a substitute for professional medical advice, diagnosis, or treatment.
-            </p>
 
             {/* Image Preview and Analysis (if image uploaded) */}
             {file && previewUrl && (
@@ -165,21 +186,40 @@ export default function Analysis() {
                   {/* Action Buttons */}
                   {!analyzing && (
                     <div className="flex gap-4">
-                      <Button
+                      <button
                         onClick={analyzeImage}
                         disabled={analyzing}
-                        className="flex-1 bg-white/10 hover:bg-white/20 border border-white/20 text-white py-6 text-lg"
+                        className="flex-1 relative bg-black border border-white/30 text-white py-6 text-lg rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        style={{
+                          boxShadow: `0 0 12px rgba(255, 255, 255, 0.2), 0 0 24px rgba(255, 255, 255, 0.1)`,
+                        }}
                       >
-                        Analyze Image
-                      </Button>
-                      <Button
+                        {/* Subtle backlighting */}
+                        <div 
+                          className="absolute inset-0 rounded-lg pointer-events-none"
+                          style={{
+                            background: `radial-gradient(circle at center, rgba(255, 255, 255, 0.1) 0%, transparent 60%)`,
+                          }}
+                        />
+                        <span className="relative z-10">Analyze Image</span>
+                      </button>
+                      <button
                         onClick={resetAnalysis}
-                        variant="outline"
-                        className="px-8 py-6 border-white/20 hover:bg-white/10"
                         disabled={analyzing}
+                        className="px-8 py-6 relative bg-black border border-white/30 text-white rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        style={{
+                          boxShadow: `0 0 8px rgba(255, 255, 255, 0.15), 0 0 16px rgba(255, 255, 255, 0.08)`,
+                        }}
                       >
-                        Cancel
-                      </Button>
+                        {/* Subtle backlighting */}
+                        <div 
+                          className="absolute inset-0 rounded-lg pointer-events-none"
+                          style={{
+                            background: `radial-gradient(circle at center, rgba(255, 255, 255, 0.08) 0%, transparent 60%)`,
+                          }}
+                        />
+                        <span className="relative z-10">Cancel</span>
+                      </button>
                     </div>
                   )}
                 </div>

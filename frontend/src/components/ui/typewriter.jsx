@@ -90,7 +90,9 @@ const Typewriter = ({
 
   return (
     <div className={`inline whitespace-pre-wrap tracking-tight ${className}`}>
-      <span>{displayText}</span>
+      <span className="bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 via-purple-500 to-pink-500">
+        {displayText}
+      </span>
       {showCursor && (
         <motion.span
           variants={cursorAnimationVariants}
