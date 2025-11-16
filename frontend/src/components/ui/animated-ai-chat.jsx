@@ -111,6 +111,7 @@ export function AnimatedAIChat({ onMessageSend, onImageUpload }) {
     const [activeSuggestion, setActiveSuggestion] = useState(-1);
     const [showCommandPalette, setShowCommandPalette] = useState(false);
     const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+    const [isDragging, setIsDragging] = useState(false);
     const { textareaRef, adjustHeight } = useAutoResizeTextarea({
         minHeight: 60,
         maxHeight: 200,
@@ -118,6 +119,7 @@ export function AnimatedAIChat({ onMessageSend, onImageUpload }) {
     const [inputFocused, setInputFocused] = useState(false);
     const commandPaletteRef = useRef(null);
     const fileInputRef = useRef(null);
+    const dropZoneRef = useRef(null);
 
     const commandSuggestions = [
         { 
@@ -269,7 +271,7 @@ export function AnimatedAIChat({ onMessageSend, onImageUpload }) {
     const removeAttachment = (index) => {
         setUploadedImages(prev => prev.filter((_, i) => i !== index));
     };
-    
+
     const selectCommandSuggestion = (index) => {
         const selectedCommand = commandSuggestions[index];
         if (selectedCommand.prefix === '/upload') {
@@ -278,6 +280,50 @@ export function AnimatedAIChat({ onMessageSend, onImageUpload }) {
             setValue(selectedCommand.prefix + ' ');
             setShowCommandPalette(false);
         }
+    };
+
+    // Drag and drop handlers
+    const handleDragEnter = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(true);
+    };
+
+    const handleDragLeave = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        // Only set isDragging to false if leaving the drop zone entirely
+        if (e.target === dropZoneRef.current) {
+            setIsDragging(false);
+        }
+    };
+
+    const handleDragOver = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+    };
+
+    const handleDrop = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(false);
+
+        const files = Array.from(e.dataTransfer.files || []);
+        files.forEach(file => {
+            if (file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const imageUrl = event.target.result;
+                    setUploadedImages(prev => [...prev, { file, url: imageUrl }]);
+
+                    // Call parent handler if provided
+                    if (onImageUpload) {
+                        onImageUpload(file);
+                    }
+                };
+                reader.readAsDataURL(file);
+            }
+        });
     };
 
     return (
@@ -289,17 +335,45 @@ export function AnimatedAIChat({ onMessageSend, onImageUpload }) {
                 transition={{ duration: 0.6, ease: "easeOut" }}
             >
 
-                <motion.div 
-                    className="relative rounded-2xl bg-black border border-white/30 overflow-hidden"
+                <motion.div
+                    ref={dropZoneRef}
+                    className={cn(
+                        "relative rounded-2xl bg-black border overflow-hidden transition-all",
+                        isDragging ? "border-white/60 border-2" : "border-white/30"
+                    )}
                     style={{
-                        boxShadow: `0 0 12px rgba(255, 255, 255, 0.2), 0 0 24px rgba(255, 255, 255, 0.1)`,
+                        boxShadow: isDragging
+                            ? `0 0 20px rgba(255, 255, 255, 0.4), 0 0 40px rgba(255, 255, 255, 0.2)`
+                            : `0 0 12px rgba(255, 255, 255, 0.2), 0 0 24px rgba(255, 255, 255, 0.1)`,
                     }}
                     initial={{ scale: 0.98 }}
                     animate={{ scale: 1 }}
                     transition={{ delay: 0.1 }}
+                    onDragEnter={handleDragEnter}
+                    onDragLeave={handleDragLeave}
+                    onDragOver={handleDragOver}
+                    onDrop={handleDrop}
                 >
+                    {/* Drag overlay */}
+                    <AnimatePresence>
+                        {isDragging && (
+                            <motion.div
+                                className="absolute inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center pointer-events-none"
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                            >
+                                <div className="text-center">
+                                    <Upload className="w-12 h-12 text-white/80 mx-auto mb-3" />
+                                    <p className="text-white/80 text-lg font-medium">Drop image here</p>
+                                    <p className="text-white/50 text-sm mt-1">Upload your skin condition image</p>
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+
                     {/* Subtle backlighting */}
-                    <div 
+                    <div
                         className="absolute inset-0 rounded-2xl pointer-events-none"
                         style={{
                             background: `radial-gradient(circle at center, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 40%, transparent 70%)`,

@@ -85,23 +85,27 @@ export const base44 = {
           const analysisData = await response.json();
 
           // Transform backend response to frontend expected format
-          if (!analysisData.success || !analysisData.rash_label) {
+          if (!analysisData.success || !analysisData.primary_condition) {
             throw new Error("No detection results available");
           }
 
           // Parse Gemini explanation to extract structured data
           const explanation = analysisData.ai_explanation || "";
-          
+
+          // Get primary prediction
+          const primaryCondition = analysisData.primary_condition;
+          const confidence = analysisData.confidence;
+
           // Determine severity based on confidence
           let severity = "Mild";
-          if (analysisData.confidence >= 80) {
+          if (confidence >= 80) {
             severity = "Severe";
-          } else if (analysisData.confidence >= 60) {
+          } else if (confidence >= 60) {
             severity = "Moderate";
           }
 
           // Determine if professional help is needed (high confidence = yes)
-          const seek_professional_help = analysisData.confidence >= 70;
+          const seek_professional_help = confidence >= 70;
 
           // Extract observations and recommendations from Gemini explanation
           // Try to parse structured content from explanation
@@ -134,17 +138,25 @@ export const base44 = {
 
           // Fallback if parsing didn't work
           if (key_observations.length === 0) {
-            key_observations.push(`Detected condition: ${analysisData.rash_label}`);
-            key_observations.push(`Confidence level: ${analysisData.confidence}%`);
+            key_observations.push(`Detected condition: ${primaryCondition.replace(/_/g, ' ')}`);
+            key_observations.push(`Confidence level: ${confidence}%`);
+
+            // Add top predictions if available
+            if (analysisData.predictions && analysisData.predictions.length > 1) {
+              key_observations.push(`Alternative possibilities: ${analysisData.predictions.slice(1, 3).map(p => p.condition.replace(/_/g, ' ')).join(', ')}`);
+            }
           }
 
-          if (recommendations.length === 0) {
+          if (recommendations.length === 0 && explanation) {
+            // If we have Gemini explanation, use it directly as a recommendation
+            recommendations.push(explanation);
+          } else if (recommendations.length === 0) {
             recommendations.push("Consult with a healthcare professional for proper diagnosis");
             recommendations.push("Follow medical advice for treatment");
           }
 
           return {
-            condition_name: analysisData.rash_label,
+            condition_name: primaryCondition.replace(/_/g, ' '),
             severity: severity,
             seek_professional_help: seek_professional_help,
             key_observations: key_observations.slice(0, 5), // Limit to 5
@@ -152,9 +164,10 @@ export const base44 = {
             disclaimer: "This analysis is for informational purposes only and is not a substitute for professional medical advice, diagnosis, or treatment. Always consult with a qualified healthcare provider.",
             // Include raw backend data for debugging
             _raw_backend_data: {
-              confidence: analysisData.confidence,
-              bounding_box: analysisData.bounding_box,
+              confidence: confidence,
+              all_predictions: analysisData.predictions,
               ai_explanation: explanation,
+              explanation_available: analysisData.explanation_available,
               mock: analysisData.mock,
             }
           };

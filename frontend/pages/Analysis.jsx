@@ -92,7 +92,16 @@ export default function Analysis() {
 
       setResults(analysis);
     } catch (err) {
-      setError("Unable to analyze the image. Please try again with a clear photo of the affected area.");
+      // Extract error message from backend response if available
+      let errorMessage = "Unable to analyze the image. Please try again with a clear photo of the affected area.";
+
+      if (err.response?.data?.error) {
+        errorMessage = err.response.data.error;
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+
+      setError(errorMessage);
       console.error("Analysis error:", err);
     } finally {
       setAnalyzing(false);
@@ -167,9 +176,10 @@ export default function Analysis() {
             />
           </div>
         ) : (
-          <div className="bg-black border border-white/30 rounded-2xl p-6 h-[500px] flex flex-col relative mt-32"
+          <div className="bg-black border border-white/30 rounded-2xl p-8 w-full max-w-7xl mx-auto flex flex-col relative mt-32"
             style={{
               boxShadow: `0 0 12px rgba(255, 255, 255, 0.2), 0 0 24px rgba(255, 255, 255, 0.1)`,
+              minHeight: '85vh'
             }}
           >
             {/* Subtle backlighting */}

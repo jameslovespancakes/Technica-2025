@@ -3,6 +3,34 @@ import { SendIcon, XIcon, LoaderIcon } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 
+// Helper function to format markdown-style text
+const formatText = (text) => {
+  if (!text) return text;
+
+  // Convert **bold** to <strong>
+  let formatted = text.replace(/\*\*(.+?)\*\*/g, '<strong class="font-bold text-white">$1</strong>');
+
+  // Convert *italic* to <em>
+  formatted = formatted.replace(/\*(.+?)\*/g, '<em class="italic">$1</em>');
+
+  // Convert ### Headers to styled headers
+  formatted = formatted.replace(/###\s+(.+?)(\n|$)/g, '<h3 class="text-base font-bold text-white mt-3 mb-2">$1</h3>');
+
+  // Convert ## Headers to styled headers
+  formatted = formatted.replace(/##\s+(.+?)(\n|$)/g, '<h2 class="text-lg font-bold text-white mt-4 mb-2">$1</h2>');
+
+  // Convert bullet points (-, *, •) to styled list items
+  formatted = formatted.replace(/^[\-\*•]\s+(.+?)$/gm, '<li class="ml-4 mb-1">• $1</li>');
+
+  // Convert numbered lists
+  formatted = formatted.replace(/^\d+\.\s+(.+?)$/gm, '<li class="ml-4 mb-1">$1</li>');
+
+  // Convert line breaks to <br>
+  formatted = formatted.replace(/\n/g, '<br/>');
+
+  return formatted;
+};
+
 export default function AnalysisResults({ results, imageUrl, onNewAnalysis }) {
   // Get full Gemini explanation from results
   const geminiExplanation = results._raw_backend_data?.ai_explanation || 
@@ -48,65 +76,47 @@ export default function AnalysisResults({ results, imageUrl, onNewAnalysis }) {
     setIsLoading(true);
 
     try {
-      // Use the existing analysis results to provide context-aware responses
-      const conditionName = results.condition_name;
-      const severity = results.severity;
-      const recommendations = results.recommendations || [];
-      const keyObservations = results.key_observations || [];
-      
-      // Generate a helpful response based on the question and analysis
-      let aiResponse = `Based on the analysis of your ${conditionName} condition (${severity} severity), `;
-      
-      // Check if question is about recommendations
-      if (userQuestion.toLowerCase().includes('recommend') || userQuestion.toLowerCase().includes('what should') || userQuestion.toLowerCase().includes('how to')) {
-        aiResponse += `here are some recommendations:\n\n`;
-        recommendations.forEach((rec, idx) => {
-          aiResponse += `${idx + 1}. ${rec}\n`;
-        });
-        aiResponse += `\nPlease consult with a healthcare professional for personalized advice.`;
-      }
-      // Check if question is about severity
-      else if (userQuestion.toLowerCase().includes('severe') || userQuestion.toLowerCase().includes('serious') || userQuestion.toLowerCase().includes('bad')) {
-        aiResponse += `the condition is classified as ${severity} severity. `;
-        if (results.seek_professional_help) {
-          aiResponse += `I strongly recommend consulting a healthcare professional for proper evaluation and treatment.`;
-        } else {
-          aiResponse += `Continue monitoring the condition and seek medical attention if symptoms worsen.`;
-        }
-      }
-      // Check if question is about professional help
-      else if (userQuestion.toLowerCase().includes('doctor') || userQuestion.toLowerCase().includes('professional') || userQuestion.toLowerCase().includes('medical')) {
-        if (results.seek_professional_help) {
-          aiResponse += `yes, I recommend consulting a healthcare professional. Given the ${severity} severity, it's important to get a proper medical evaluation.`;
-        } else {
-          aiResponse += `while this appears to be a ${severity} case, it's always wise to consult a healthcare professional for proper diagnosis and treatment.`;
-        }
-      }
-      // Check if question is about symptoms/observations
-      else if (userQuestion.toLowerCase().includes('symptom') || userQuestion.toLowerCase().includes('observe') || userQuestion.toLowerCase().includes('characteristic')) {
-        aiResponse += `key observations include:\n\n`;
-        keyObservations.forEach((obs, idx) => {
-          aiResponse += `${idx + 1}. ${obs}\n`;
-        });
-      }
-      // Default response - reference the full explanation
-      else {
-        aiResponse += `regarding your question: "${userQuestion}" - `;
-        aiResponse += `Based on the analysis, this appears to be ${conditionName} with ${severity} severity. `;
-        if (recommendations.length > 0) {
-          aiResponse += `Key recommendations include: ${recommendations.slice(0, 2).join(', ')}. `;
-        }
-        aiResponse += `For specific concerns, please refer to the detailed analysis above or consult with a healthcare professional.`;
+      // Call backend /chat endpoint with conversation history
+      const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
+      const response = await fetch(`${API_BASE_URL}/chat`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          message: userQuestion,
+          conversation_history: messages.map(m => ({
+            role: m.role,
+            content: m.content
+          })),
+          analysis_context: {
+            condition: results.condition_name,
+            severity: results.severity,
+            confidence: results._raw_backend_data?.confidence,
+            predictions: results._raw_backend_data?.all_predictions,
+          }
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to get response from AI");
       }
 
-      const aiMessage = {
-        id: messages.length + 2,
-        role: "assistant",
-        content: aiResponse,
-        timestamp: new Date(),
-      };
-      
-      setMessages((prev) => [...prev, aiMessage]);
+      const data = await response.json();
+
+      if (data.success) {
+        const aiMessage = {
+          id: messages.length + 2,
+          role: "assistant",
+          content: data.response,
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, aiMessage]);
+      } else {
+        throw new Error(data.error || "Failed to generate response");
+      }
+
       setIsLoading(false);
     } catch (error) {
       console.error("Error generating response:", error);
@@ -163,14 +173,18 @@ export default function AnalysisResults({ results, imageUrl, onNewAnalysis }) {
           >
             <div
               className={cn(
-                "max-w-xs rounded-xl p-4",
+                "max-w-4xl rounded-xl p-5",
                 "bg-white/10 border border-white/20 text-white"
               )}
               style={{
                 boxShadow: `0 0 8px rgba(255, 255, 255, 0.1), 0 0 16px rgba(255, 255, 255, 0.05)`,
               }}
             >
-              <p className="text-sm">{message.content}</p>
+              <div
+                className="text-sm prose prose-invert max-w-none leading-relaxed"
+                style={{ wordBreak: 'break-word' }}
+                dangerouslySetInnerHTML={{ __html: formatText(message.content) }}
+              />
               <p className="text-xs text-gray-500 mt-2">
                 {message.timestamp.toLocaleTimeString([], {
                   hour: "2-digit",

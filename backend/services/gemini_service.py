@@ -56,9 +56,9 @@ def load_gemini_client() -> bool:
     api_key = get_gemini_api_key()
 
     if not api_key:
-        print("⚠️  Gemini API key not found in environment variables")
-        print("   Please set GOOGLE_API_KEY or GEMINI_API_KEY in .env file")
-        print("   AI explanations will be unavailable")
+        print(" [WARN] Gemini API key not found in environment variables")
+        print(" [INFO] Set GOOGLE_API_KEY or GEMINI_API_KEY in .env file")
+        print(" [INFO] AI explanations will be unavailable")
         _gemini_available = False
         return False
 
@@ -67,16 +67,17 @@ def load_gemini_client() -> bool:
         genai.configure(api_key=api_key)
 
         # Initialize model
-        print(f"🔄 Initializing Gemini API client (model: {GEMINI_MODEL})")
+        print(f" [LOAD] Initializing Gemini API client")
+        print(f" [INFO] Model: {GEMINI_MODEL}")
         _gemini_model = genai.GenerativeModel(GEMINI_MODEL)
         _gemini_available = True
 
-        print("✅ Gemini API client initialized successfully!")
+        print(" [SUCCESS] Gemini API client initialized successfully!")
         return True
 
     except Exception as e:
-        print(f"❌ Error initializing Gemini API: {str(e)}")
-        print("   AI explanations will be unavailable")
+        print(f" [ERROR] Failed to initialize Gemini API: {str(e)}")
+        print(" [INFO] AI explanations will be unavailable")
         _gemini_available = False
         return False
 
@@ -110,19 +111,17 @@ def format_prompt_for_gemini(detections: list, user_context: str = "") -> str:
     if not detections or len(detections) == 0:
         return "No detections found."
 
-    # Build detection summary
+    # Build detection summary (without confidence scores in output)
     detection_summary = []
     for i, detection in enumerate(detections, 1):
         label = detection.get("rash_label", "unknown")
-        confidence = detection.get("confidence", 0)
-        detection_summary.append(f"{i}. {label} ({confidence}% confidence)")
+        detection_summary.append(f"{i}. {label}")
 
     detections_text = "\n".join(detection_summary)
 
     # Primary detection (highest confidence)
     primary = detections[0]
     primary_label = primary.get("rash_label", "unknown")
-    primary_confidence = primary.get("confidence", 0)
 
     # Build prompt with user context prominently featured
     if user_context and user_context.strip():
@@ -140,11 +139,11 @@ The user has provided this information about their condition. Your analysis MUST
         context_section = ""
 
     # Shorter, more focused prompt for faster responses
-    prompt = f"""You are a medical AI assistant. A skin condition detection model analyzed an image and identified the following potential conditions (ranked by confidence):
+    prompt = f"""You are a medical AI assistant. A skin condition detection model analyzed an image and identified the following potential conditions (ranked by likelihood):
 
 {detections_text}
 
-The model's primary prediction is {primary_label} ({primary_confidence}% confidence), but other conditions are also possible.{context_section}
+The model's primary prediction is {primary_label}, but other conditions are also possible.{context_section}
 
 Provide a concise explanation that:
 1. **Directly addresses the user's description** (if provided) - explain how it relates to each detected condition
@@ -154,7 +153,7 @@ Provide a concise explanation that:
 5. **Personalized care recommendations** based on the user's specific situation and description
 6. When to seek professional medical care for proper diagnosis
 
-Keep response under 400 words. Emphasize this is informational only, not medical advice. Professional diagnosis is needed to distinguish between similar conditions."""
+Keep response under 400 words. Emphasize this is informational only, not medical advice. Professional diagnosis is needed to distinguish between similar conditions. Do not mention specific confidence percentages in your response."""
 
     return prompt
 
@@ -222,7 +221,6 @@ def generate_explanation(detections: list, user_context: str = "") -> Dict:
             prompt, generation_config=genai.types.GenerationConfig(**GENERATION_CONFIG)
         )
         api_time = time.time() - start_time
-        print(f"   ⏱️  Gemini API call took: {api_time:.2f}s")
 
         # Extract explanation text
         if hasattr(response, "text") and response.text:
@@ -252,6 +250,119 @@ def generate_explanation(detections: list, user_context: str = "") -> Dict:
             "API key" in error_message.lower()
             or "authentication" in error_message.lower()
         ):
+            error_msg = "Invalid API key or authentication error"
+        elif "quota" in error_message.lower() or "rate limit" in error_message.lower():
+            error_msg = "API quota exceeded or rate limit reached"
+        elif "timeout" in error_message.lower():
+            error_msg = "Request timeout - API took too long to respond"
+        else:
+            error_msg = f"Gemini API error: {error_message}"
+
+        return {
+            "success": False,
+            "explanation": None,
+            "error": error_msg,
+        }
+
+
+def generate_chat_response(
+    user_message: str,
+    conversation_history: list = None,
+    analysis_context: dict = None
+) -> Dict:
+    """
+    Generate a chat response from Gemini API for follow-up questions.
+    Maintains conversation context and references the initial analysis.
+
+    Args:
+        user_message: The user's follow-up question
+        conversation_history: List of previous messages [{"role": "user"|"assistant", "content": str}]
+        analysis_context: Context from initial analysis {"condition": str, "confidence": float, "explanation": str}
+
+    Returns:
+        dict: Result dictionary with format:
+            {
+                "success": bool,
+                "explanation": str (if success) or None,
+                "error": str (if failed) or None
+            }
+    """
+    if not is_gemini_available():
+        return {
+            "success": False,
+            "explanation": None,
+            "error": "Gemini API not available - API key not configured",
+        }
+
+    try:
+        # Build context-aware prompt
+        context_parts = []
+
+        # Add analysis context if available
+        if analysis_context:
+            condition = analysis_context.get("condition", "unknown")
+            confidence = analysis_context.get("confidence", 0)
+            initial_explanation = analysis_context.get("explanation", "")
+
+            context_parts.append(f"""Initial Analysis Context:
+- Detected Condition: {condition} ({confidence}% confidence)
+- Initial Explanation: {initial_explanation[:500]}...""")
+
+        # Add conversation history
+        if conversation_history:
+            history_text = "\n".join([
+                f"{'User' if msg['role'] == 'user' else 'Assistant'}: {msg['content']}"
+                for msg in conversation_history[-5:]  # Last 5 messages for context
+            ])
+            context_parts.append(f"\nRecent Conversation:\n{history_text}")
+
+        # Build full prompt
+        context = "\n\n".join(context_parts) if context_parts else "No prior context."
+
+        prompt = f"""{context}
+
+User's Follow-up Question: {user_message}
+
+Please provide a helpful, concise response that:
+1. Directly answers the user's question
+2. References the initial analysis when relevant
+3. Maintains conversation continuity
+4. Stays under 300 words
+5. Reminds that this is informational only, not medical advice
+
+Response:"""
+
+        # Call Gemini API
+        start_time = time.time()
+        response = _gemini_model.generate_content(
+            prompt,
+            generation_config=genai.types.GenerationConfig(**GENERATION_CONFIG)
+        )
+        api_time = time.time() - start_time
+
+        # Extract response
+        if hasattr(response, "text") and response.text:
+            explanation = response.text.strip()
+        else:
+            explanation = str(response).strip()
+
+        if not explanation:
+            return {
+                "success": False,
+                "explanation": None,
+                "error": "Gemini API returned empty response",
+            }
+
+        return {
+            "success": True,
+            "explanation": explanation,
+            "error": None,
+        }
+
+    except Exception as e:
+        error_message = str(e)
+
+        if "API key" in error_message.lower() or "authentication" in error_message.lower():
             error_msg = "Invalid API key or authentication error"
         elif "quota" in error_message.lower() or "rate limit" in error_message.lower():
             error_msg = "API quota exceeded or rate limit reached"
