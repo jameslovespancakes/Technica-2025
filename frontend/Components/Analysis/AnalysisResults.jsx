@@ -4,11 +4,16 @@ import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 export default function AnalysisResults({ results, imageUrl, onNewAnalysis }) {
+  // Get full Gemini explanation from results
+  const geminiExplanation = results._raw_backend_data?.ai_explanation || 
+    results.ai_explanation || 
+    `I've analyzed your skin image and found: **${results.condition_name}** (${results.severity} severity). ${results.seek_professional_help ? "I recommend consulting a healthcare professional." : "Continue monitoring this condition."}`;
+
   const [messages, setMessages] = useState([
     {
       id: 1,
       role: "assistant",
-      content: `I've analyzed your skin image and found: **${results.condition_name}** (${results.severity} severity). ${results.seek_professional_help ? "I recommend consulting a healthcare professional." : "Continue monitoring this condition."}`,
+      content: geminiExplanation,
       timestamp: new Date(),
     },
   ]);
@@ -38,20 +43,82 @@ export default function AnalysisResults({ results, imageUrl, onNewAnalysis }) {
     };
 
     setMessages((prev) => [...prev, userMessage]);
+    const userQuestion = inputValue;
     setInputValue("");
     setIsLoading(true);
 
-    // Simulate AI response
-    setTimeout(() => {
+    try {
+      // Use the existing analysis results to provide context-aware responses
+      const conditionName = results.condition_name;
+      const severity = results.severity;
+      const recommendations = results.recommendations || [];
+      const keyObservations = results.key_observations || [];
+      
+      // Generate a helpful response based on the question and analysis
+      let aiResponse = `Based on the analysis of your ${conditionName} condition (${severity} severity), `;
+      
+      // Check if question is about recommendations
+      if (userQuestion.toLowerCase().includes('recommend') || userQuestion.toLowerCase().includes('what should') || userQuestion.toLowerCase().includes('how to')) {
+        aiResponse += `here are some recommendations:\n\n`;
+        recommendations.forEach((rec, idx) => {
+          aiResponse += `${idx + 1}. ${rec}\n`;
+        });
+        aiResponse += `\nPlease consult with a healthcare professional for personalized advice.`;
+      }
+      // Check if question is about severity
+      else if (userQuestion.toLowerCase().includes('severe') || userQuestion.toLowerCase().includes('serious') || userQuestion.toLowerCase().includes('bad')) {
+        aiResponse += `the condition is classified as ${severity} severity. `;
+        if (results.seek_professional_help) {
+          aiResponse += `I strongly recommend consulting a healthcare professional for proper evaluation and treatment.`;
+        } else {
+          aiResponse += `Continue monitoring the condition and seek medical attention if symptoms worsen.`;
+        }
+      }
+      // Check if question is about professional help
+      else if (userQuestion.toLowerCase().includes('doctor') || userQuestion.toLowerCase().includes('professional') || userQuestion.toLowerCase().includes('medical')) {
+        if (results.seek_professional_help) {
+          aiResponse += `yes, I recommend consulting a healthcare professional. Given the ${severity} severity, it's important to get a proper medical evaluation.`;
+        } else {
+          aiResponse += `while this appears to be a ${severity} case, it's always wise to consult a healthcare professional for proper diagnosis and treatment.`;
+        }
+      }
+      // Check if question is about symptoms/observations
+      else if (userQuestion.toLowerCase().includes('symptom') || userQuestion.toLowerCase().includes('observe') || userQuestion.toLowerCase().includes('characteristic')) {
+        aiResponse += `key observations include:\n\n`;
+        keyObservations.forEach((obs, idx) => {
+          aiResponse += `${idx + 1}. ${obs}\n`;
+        });
+      }
+      // Default response - reference the full explanation
+      else {
+        aiResponse += `regarding your question: "${userQuestion}" - `;
+        aiResponse += `Based on the analysis, this appears to be ${conditionName} with ${severity} severity. `;
+        if (recommendations.length > 0) {
+          aiResponse += `Key recommendations include: ${recommendations.slice(0, 2).join(', ')}. `;
+        }
+        aiResponse += `For specific concerns, please refer to the detailed analysis above or consult with a healthcare professional.`;
+      }
+
       const aiMessage = {
         id: messages.length + 2,
         role: "assistant",
-        content: `Based on the analysis of your skin condition and your question about "${inputValue}", here's what I can tell you: The condition appears to be manageable with proper care. Please follow the recommendations provided and consult a healthcare professional if symptoms worsen.`,
+        content: aiResponse,
         timestamp: new Date(),
       };
+      
       setMessages((prev) => [...prev, aiMessage]);
       setIsLoading(false);
-    }, 1000);
+    } catch (error) {
+      console.error("Error generating response:", error);
+      const errorMessage = {
+        id: messages.length + 2,
+        role: "assistant",
+        content: "I apologize, but I'm having trouble processing your question. Please try rephrasing it or consult the analysis results above.",
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+      setIsLoading(false);
+    }
   };
 
   const handleKeyDown = (e) => {

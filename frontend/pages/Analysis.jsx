@@ -54,7 +54,7 @@ export default function Analysis() {
 
     try {
       // Upload the file
-      const { file_url } = await base44.integrations.Core.UploadFile({ file: imageFile });
+      const { file_url, backend_response } = await base44.integrations.Core.UploadFile({ file: imageFile });
 
       // Build prompt with user description if provided
       const basePrompt = `You are a medical AI assistant specializing in dermatology. Analyze this skin image and provide:
@@ -71,10 +71,12 @@ export default function Analysis() {
         ? `${basePrompt}\n\nUser's description: ${userDescription}`
         : basePrompt;
 
-      // Analyze with AI
+      // Analyze with AI - pass filename and user context from upload response
       const analysis = await base44.integrations.Core.InvokeLLM({
         prompt: prompt,
         file_urls: [file_url],
+        filename: backend_response?.filename, // Pass filename from upload
+        user_context: userDescription, // Pass user's text description/context
         response_json_schema: {
           type: "object",
           properties: {
