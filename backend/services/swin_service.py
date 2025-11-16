@@ -73,8 +73,8 @@ def load_swin_model(model_path: str = "models/swin_best.pt") -> bool:
         else:
             state_dict = checkpoint
 
-        # Detect model variant from patch_embed dimensions
-        embed_dim = state_dict.get("patch_embed.proj.weight", torch.zeros(96, 3, 4, 4)).shape[0]
+        # Use fixed model architecture matching test file
+        model_name = "swinv2_small_window16_256"
 
         # Detect number of classes from the final layer
         num_classes = len(CLASS_NAMES)
@@ -84,17 +84,7 @@ def load_swin_model(model_path: str = "models/swin_best.pt") -> bool:
             num_classes = state_dict["head.weight"].shape[0]
 
         print(f" [INFO] Detected {num_classes} classes in checkpoint")
-
-        # Map embedding dimensions to model variants
-        model_variants = {
-            96: "swinv2_tiny_window8_256",
-            128: "swinv2_small_window8_256",
-            192: "swinv2_base_window8_256",
-            384: "swinv2_large_window12_192"
-        }
-
-        model_name = model_variants.get(embed_dim, "swinv2_tiny_window8_256")
-        print(f" [INFO] Model variant: {model_name} (embed_dim={embed_dim})")
+        print(f" [INFO] Model variant: {model_name}")
 
         # Create model architecture with correct number of classes
         model = timm.create_model(
@@ -192,10 +182,45 @@ def get_tta_transforms():
             transforms.RandomVerticalFlip(p=1.0),
             base_normalize
         ]),
-        # Center crop from slightly larger
+        # Center crop
         transforms.Compose([
-            transforms.Resize((282, 282)),
+            transforms.Resize((int(256 * 1.1), int(256 * 1.1))),
             transforms.CenterCrop(256),
+            base_normalize
+        ]),
+        # Five crop - top left
+        transforms.Compose([
+            transforms.Resize((int(256 * 1.2), int(256 * 1.2))),
+            transforms.FiveCrop(256),
+            transforms.Lambda(lambda crops: crops[0]),  # Top-left
+            base_normalize
+        ]),
+        # Five crop - top right
+        transforms.Compose([
+            transforms.Resize((int(256 * 1.2), int(256 * 1.2))),
+            transforms.FiveCrop(256),
+            transforms.Lambda(lambda crops: crops[1]),  # Top-right
+            base_normalize
+        ]),
+        # Five crop - bottom left
+        transforms.Compose([
+            transforms.Resize((int(256 * 1.2), int(256 * 1.2))),
+            transforms.FiveCrop(256),
+            transforms.Lambda(lambda crops: crops[2]),  # Bottom-left
+            base_normalize
+        ]),
+        # Five crop - bottom right
+        transforms.Compose([
+            transforms.Resize((int(256 * 1.2), int(256 * 1.2))),
+            transforms.FiveCrop(256),
+            transforms.Lambda(lambda crops: crops[3]),  # Bottom-right
+            base_normalize
+        ]),
+        # Five crop - center
+        transforms.Compose([
+            transforms.Resize((int(256 * 1.2), int(256 * 1.2))),
+            transforms.FiveCrop(256),
+            transforms.Lambda(lambda crops: crops[4]),  # Center
             base_normalize
         ]),
     ]

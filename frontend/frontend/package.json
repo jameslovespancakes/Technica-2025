@@ -1,6 +1,0 @@
-{
-  "dependencies": {
-    "@splinetool/react-spline": "^4.1.0",
-    "simplex-noise": "^4.0.3"
-  }
-}
