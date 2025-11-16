@@ -33,10 +33,11 @@ uploads/*
 Thumbs.db
 desktop.ini
 
-# Model files (if large - uncomment if you don't want to commit models)
-# models/*.pt
-# models/*.pth
-# models/*.onnx
+# Model files (too large for GitHub - 590MB)
+models/*.pt
+models/*.pth
+models/*.onnx
+!models/class_mapping.json
 
 # Logs
 *.log
