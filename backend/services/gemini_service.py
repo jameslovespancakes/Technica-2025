@@ -147,7 +147,7 @@ The model's primary prediction is {primary_label}, but other conditions are also
 
 Provide a concise explanation that:
 1. **Directly addresses the user's description** (if provided) - explain how it relates to each detected condition
-2. Brief overview of each detected condition (top 3)
+2. Brief overview of ALL detected conditions listed above (top 5)
 3. Why multiple conditions might be detected (similar appearance, overlapping symptoms)
 4. Key differences between the top conditions
 5. **Personalized care recommendations** based on the user's specific situation and description
