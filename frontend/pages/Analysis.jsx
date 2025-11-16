@@ -118,40 +118,42 @@ export default function Analysis() {
 
       <div className="max-w-5xl mx-auto relative z-10">
         {/* Header */}
-        <div className="text-center mb-8 pt-32 md:pt-40">
-          <h1 
-            className="text-4xl md:text-5xl font-bold mb-4 pb-2 leading-tight bg-clip-text text-transparent bg-gradient-to-r from-gray-500 via-gray-200 to-gray-600 bg-[length:200%_auto] animate-shimmer"
-            style={{
-              backgroundSize: '200% auto',
-              animation: 'shimmer 3s ease-in-out infinite',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              backgroundClip: 'text',
-            }}
-          >
-            Skin Analysis
-          </h1>
-          <style>{`
-            @keyframes shimmer {
-              0% {
-                background-position: 0% center;
+        {!results && (
+          <div className="text-center mb-8 pt-32 md:pt-40">
+            <h1 
+              className="text-4xl md:text-5xl font-bold mb-4 pb-2 leading-tight bg-clip-text text-transparent bg-gradient-to-r from-gray-500 via-gray-200 to-gray-600 bg-[length:200%_auto] animate-shimmer"
+              style={{
+                backgroundSize: '200% auto',
+                animation: 'shimmer 3s ease-in-out infinite',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text',
+              }}
+            >
+              Skin Analysis
+            </h1>
+            <style>{`
+              @keyframes shimmer {
+                0% {
+                  background-position: 0% center;
+                }
+                50% {
+                  background-position: 100% center;
+                }
+                100% {
+                  background-position: 0% center;
+                }
               }
-              50% {
-                background-position: 100% center;
-              }
-              100% {
-                background-position: 0% center;
-              }
-            }
-          `}</style>
-          <p className="text-gray-400 text-lg mb-2">
-            Upload a clear photo of your skin condition for instant AI-powered analysis
-          </p>
-          {/* Medical Disclaimer */}
-          <p className="text-xs text-gray-500 text-center">
-            <strong className="text-gray-400">Medical Disclaimer:</strong> This tool is for informational purposes only and is not a substitute for professional medical advice, diagnosis, or treatment.
-          </p>
-        </div>
+            `}</style>
+            <p className="text-gray-400 text-lg mb-2">
+              Upload a clear photo of your skin condition for instant AI-powered analysis
+            </p>
+            {/* Medical Disclaimer */}
+            <p className="text-xs text-gray-500 text-center">
+              <strong className="text-gray-400">Medical Disclaimer:</strong> This tool is for informational purposes only and is not a substitute for professional medical advice, diagnosis, or treatment.
+            </p>
+          </div>
+        )}
 
         {/* Main Content */}
         {!results ? (
@@ -161,77 +163,28 @@ export default function Analysis() {
               onMessageSend={handleMessageSend}
               onImageUpload={handleImageUpload}
             />
-
-            {/* Image Preview and Analysis (if image uploaded) */}
-            {file && previewUrl && (
-              <div className="glass-card rounded-3xl p-8 md:p-12">
-                <div className="space-y-6">
-                  {/* Image Preview */}
-                  <div className="relative rounded-2xl overflow-hidden bg-black/30">
-                    <img
-                      src={previewUrl}
-                      alt="Preview"
-                      className="w-full max-h-96 object-contain"
-                    />
-                  </div>
-
-                  {/* Error Message */}
-                  {error && (
-                    <Alert variant="destructive">
-                      <AlertCircle className="h-4 w-4" />
-                      <AlertDescription>{error}</AlertDescription>
-                    </Alert>
-                  )}
-
-                  {/* Action Buttons */}
-                  {!analyzing && (
-                    <div className="flex gap-4">
-                      <button
-                        onClick={analyzeImage}
-                        disabled={analyzing}
-                        className="flex-1 relative bg-black border border-white/30 text-white py-6 text-lg rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                        style={{
-                          boxShadow: `0 0 12px rgba(255, 255, 255, 0.2), 0 0 24px rgba(255, 255, 255, 0.1)`,
-                        }}
-                      >
-                        {/* Subtle backlighting */}
-                        <div 
-                          className="absolute inset-0 rounded-lg pointer-events-none"
-                          style={{
-                            background: `radial-gradient(circle at center, rgba(255, 255, 255, 0.1) 0%, transparent 60%)`,
-                          }}
-                        />
-                        <span className="relative z-10">Analyze Image</span>
-                      </button>
-                      <button
-                        onClick={resetAnalysis}
-                        disabled={analyzing}
-                        className="px-8 py-6 relative bg-black border border-white/30 text-white rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                        style={{
-                          boxShadow: `0 0 8px rgba(255, 255, 255, 0.15), 0 0 16px rgba(255, 255, 255, 0.08)`,
-                        }}
-                      >
-                        {/* Subtle backlighting */}
-                        <div 
-                          className="absolute inset-0 rounded-lg pointer-events-none"
-                          style={{
-                            background: `radial-gradient(circle at center, rgba(255, 255, 255, 0.08) 0%, transparent 60%)`,
-                          }}
-                        />
-                        <span className="relative z-10">Cancel</span>
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
           </div>
         ) : (
-          <AnalysisResults
-            results={results}
-            imageUrl={previewUrl}
-            onNewAnalysis={resetAnalysis}
-          />
+          <div className="bg-black border border-white/30 rounded-2xl p-6 h-[500px] flex flex-col relative mt-32"
+            style={{
+              boxShadow: `0 0 12px rgba(255, 255, 255, 0.2), 0 0 24px rgba(255, 255, 255, 0.1)`,
+            }}
+          >
+            {/* Subtle backlighting */}
+            <div 
+              className="absolute inset-0 rounded-2xl pointer-events-none"
+              style={{
+                background: `radial-gradient(circle at center, rgba(255, 255, 255, 0.1) 0%, transparent 60%)`,
+              }}
+            />
+            <div className="relative z-10 h-full flex flex-col">
+              <AnalysisResults
+                results={results}
+                imageUrl={previewUrl}
+                onNewAnalysis={resetAnalysis}
+              />
+            </div>
+          </div>
         )}
       </div>
     </div>

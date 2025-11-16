@@ -1,141 +1,217 @@
-import React from "react";
-import { Button } from "@/components/ui/button";
-import { AlertCircle, CheckCircle2, AlertTriangle, ArrowRight, RefreshCw } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import React, { useState, useRef, useEffect } from "react";
+import { SendIcon, XIcon, LoaderIcon } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { cn } from "@/lib/utils";
 
 export default function AnalysisResults({ results, imageUrl, onNewAnalysis }) {
-  const getSeverityColor = (severity) => {
-    switch (severity?.toLowerCase()) {
-      case "mild":
-        return "text-green-400 bg-green-950/30 border-green-500/30";
-      case "moderate":
-        return "text-yellow-400 bg-yellow-950/30 border-yellow-500/30";
-      case "severe":
-        return "text-red-400 bg-red-950/30 border-red-500/30";
-      default:
-        return "text-gray-400 bg-gray-950/30 border-gray-500/30";
-    }
+  const [messages, setMessages] = useState([
+    {
+      id: 1,
+      role: "assistant",
+      content: `I've analyzed your skin image and found: **${results.condition_name}** (${results.severity} severity). ${results.seek_professional_help ? "I recommend consulting a healthcare professional." : "Continue monitoring this condition."}`,
+      timestamp: new Date(),
+    },
+  ]);
+  const [inputValue, setInputValue] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
+  const messagesEndRef = useRef(null);
+  const textareaRef = useRef(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  const getSeverityIcon = (severity) => {
-    switch (severity?.toLowerCase()) {
-      case "mild":
-        return CheckCircle2;
-      case "moderate":
-        return AlertTriangle;
-      case "severe":
-        return AlertCircle;
-      default:
-        return AlertCircle;
-    }
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  const handleSendMessage = async () => {
+    if (!inputValue.trim()) return;
+
+    // Add user message
+    const userMessage = {
+      id: messages.length + 1,
+      role: "user",
+      content: inputValue,
+      timestamp: new Date(),
+    };
+
+    setMessages((prev) => [...prev, userMessage]);
+    setInputValue("");
+    setIsLoading(true);
+
+    // Simulate AI response
+    setTimeout(() => {
+      const aiMessage = {
+        id: messages.length + 2,
+        role: "assistant",
+        content: `Based on the analysis of your skin condition and your question about "${inputValue}", here's what I can tell you: The condition appears to be manageable with proper care. Please follow the recommendations provided and consult a healthcare professional if symptoms worsen.`,
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, aiMessage]);
+      setIsLoading(false);
+    }, 1000);
   };
 
-  const SeverityIcon = getSeverityIcon(results.severity);
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
 
   return (
-    <div className="space-y-6">
-      {/* Results Header */}
-      <div className="glass-card rounded-3xl p-8">
-        <div className="flex items-center gap-4 mb-6">
-          <div className="w-12 h-12 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center">
-            <SeverityIcon className="w-6 h-6 text-white" />
-          </div>
-          <div>
-            <h2 className="text-2xl font-bold">Analysis Complete</h2>
-            <p className="text-gray-400">Here are your results</p>
-          </div>
-        </div>
-
-        {/* Image Preview */}
-        <div className="rounded-xl overflow-hidden mb-6 bg-black/30">
-          <img
-            src={imageUrl}
-            alt="Analyzed skin"
-            className="w-full max-h-64 object-contain"
-          />
-        </div>
-
-        {/* Condition & Severity */}
-        <div className="grid md:grid-cols-2 gap-4 mb-6">
-          <div className="glass-card rounded-xl p-4">
-            <p className="text-sm text-gray-400 mb-1">Identified Condition</p>
-            <p className="text-xl font-semibold">{results.condition_name}</p>
-          </div>
-          <div className={`rounded-xl p-4 border ${getSeverityColor(results.severity)}`}>
-            <p className="text-sm opacity-80 mb-1">Severity Level</p>
-            <p className="text-xl font-semibold">{results.severity}</p>
+    <div className="w-full h-full flex flex-col relative">
+      {/* Chat Container */}
+      <div className="flex-1 overflow-y-auto pb-4 space-y-4">
+        {/* Initial Analysis Summary */}
+        <div className="flex justify-start">
+          <div className="max-w-xs bg-black border border-white/30 rounded-xl p-4">
+            <div className="flex gap-3">
+              <img
+                src={imageUrl}
+                alt="Analyzed"
+                className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
+              />
+              <div className="flex-1">
+                <p className="text-xs text-gray-400 mb-1">Analysis Complete</p>
+                <p className="text-sm font-semibold">{results.condition_name}</p>
+                <p className="text-xs text-gray-400">{results.severity} Severity</p>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Professional Help Alert */}
-        {results.seek_professional_help ? (
-          <Alert className="bg-red-950/30 border-red-500/30 mb-6">
-            <AlertCircle className="h-5 w-5 text-red-400" />
-            <AlertDescription className="text-red-200">
-              <strong>Medical Attention Recommended:</strong> Based on the analysis, we recommend consulting a healthcare professional for proper diagnosis and treatment.
-            </AlertDescription>
-          </Alert>
-        ) : (
-          <Alert className="bg-green-950/30 border-green-500/30 mb-6">
-            <CheckCircle2 className="h-5 w-5 text-green-400" />
-            <AlertDescription className="text-green-200">
-              <strong>Monitoring Recommended:</strong> While professional care may not be urgently needed, continue to monitor the condition. Consult a doctor if it worsens.
-            </AlertDescription>
-          </Alert>
+        {/* Messages */}
+        {messages.map((message, index) => (
+          <motion.div
+            key={message.id}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className={cn(
+              "flex",
+              message.role === "user" ? "justify-end" : "justify-start"
+            )}
+          >
+            <div
+              className={cn(
+                "max-w-xs rounded-xl p-4",
+                "bg-white/10 border border-white/20 text-white"
+              )}
+              style={{
+                boxShadow: `0 0 8px rgba(255, 255, 255, 0.1), 0 0 16px rgba(255, 255, 255, 0.05)`,
+              }}
+            >
+              <p className="text-sm">{message.content}</p>
+              <p className="text-xs text-gray-500 mt-2">
+                {message.timestamp.toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </p>
+            </div>
+          </motion.div>
+        ))}
+
+        {/* Loading Indicator */}
+        {isLoading && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex justify-start"
+          >
+            <div className="bg-black border border-white/30 rounded-xl p-4">
+              <div className="flex items-center gap-2">
+                <LoaderIcon className="w-4 h-4 animate-spin text-white/60" />
+                <span className="text-sm text-gray-400">AI is thinking...</span>
+              </div>
+            </div>
+          </motion.div>
         )}
+
+        <div ref={messagesEndRef} />
       </div>
 
-      {/* Key Observations */}
-      <div className="glass-card rounded-3xl p-8">
-        <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-white/60" />
-          Key Observations
-        </h3>
-        <ul className="space-y-3">
-          {results.key_observations?.map((observation, index) => (
-            <li key={index} className="flex items-start gap-3 text-gray-300">
-              <ArrowRight className="w-5 h-5 text-white/60 mt-0.5 flex-shrink-0" />
-              <span>{observation}</span>
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      {/* Recommendations */}
-      <div className="glass-card rounded-3xl p-8">
-        <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-white/60" />
-          Recommendations
-        </h3>
-        <ul className="space-y-3">
-          {results.recommendations?.map((recommendation, index) => (
-            <li key={index} className="flex items-start gap-3 text-gray-300">
-              <CheckCircle2 className="w-5 h-5 text-green-400 mt-0.5 flex-shrink-0" />
-              <span>{recommendation}</span>
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      {/* Disclaimer */}
-      {results.disclaimer && (
-        <Alert className="bg-yellow-950/20 border-yellow-500/30">
-          <AlertTriangle className="h-4 w-4 text-yellow-500" />
-          <AlertDescription className="text-yellow-200 text-sm">
-            {results.disclaimer}
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {/* Action Button */}
-      <div className="flex justify-center">
-        <Button
-          onClick={onNewAnalysis}
-          className="bg-white/10 hover:bg-white/20 border border-white/20 text-white px-8 py-6 text-lg"
-        >
-          <RefreshCw className="w-5 h-5 mr-2" />
-          Analyze Another Image
-        </Button>
+      {/* Input Area */}
+      <div className="mt-6 pt-6">
+        <div className="flex gap-3">
+          <div className="flex-1 relative">
+            <textarea
+              ref={textareaRef}
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onKeyDown={handleKeyDown}
+              onFocus={() => setIsFocused(true)}
+              onBlur={() => setIsFocused(false)}
+              placeholder="Ask a follow-up question..."
+              className="w-full px-4 py-3 bg-black border border-white/30 rounded-lg text-white placeholder:text-gray-500 text-sm resize-none outline-none focus:outline-none transition-all"
+              rows="1"
+              style={{
+                boxShadow: isFocused || inputValue.trim()
+                  ? `0 0 12px rgba(255, 255, 255, 0.2), 0 0 24px rgba(255, 255, 255, 0.1)`
+                  : `0 0 8px rgba(255, 255, 255, 0.15), 0 0 16px rgba(255, 255, 255, 0.08)`,
+              }}
+            />
+            {/* Subtle backlighting */}
+            <div
+              className="absolute inset-0 rounded-lg pointer-events-none"
+              style={{
+                background: `radial-gradient(circle at center, rgba(255, 255, 255, 0.08) 0%, transparent 60%)`,
+              }}
+            />
+          </div>
+          <motion.button
+            onClick={handleSendMessage}
+            disabled={isLoading || !inputValue.trim()}
+            whileTap={{ scale: 0.95 }}
+            className={cn(
+              "p-3 rounded-lg relative transition-all flex items-center justify-center",
+              inputValue.trim()
+                ? "bg-black border border-white/30 text-white hover:border-white/50"
+                : "bg-black/50 border border-white/20 text-white/40 cursor-not-allowed"
+            )}
+            style={{
+              boxShadow:
+                inputValue.trim() || isLoading
+                  ? `0 0 12px rgba(255, 255, 255, 0.2), 0 0 24px rgba(255, 255, 255, 0.1)`
+                  : `0 0 6px rgba(255, 255, 255, 0.1), 0 0 12px rgba(255, 255, 255, 0.05)`,
+            }}
+          >
+            {/* Subtle backlighting */}
+            {(inputValue.trim() || isLoading) && (
+              <div
+                className="absolute inset-0 rounded-lg pointer-events-none"
+                style={{
+                  background: `radial-gradient(circle at center, rgba(255, 255, 255, 0.1) 0%, transparent 60%)`,
+                }}
+              />
+            )}
+            {isLoading ? (
+              <LoaderIcon className="w-5 h-5 animate-spin relative z-10" />
+            ) : (
+              <SendIcon className="w-5 h-5 relative z-10" />
+            )}
+          </motion.button>
+          <motion.button
+            onClick={onNewAnalysis}
+            whileTap={{ scale: 0.95 }}
+            className="p-3 rounded-lg bg-black border border-white/30 text-white hover:border-white/50 transition-all relative"
+            style={{
+              boxShadow: `0 0 8px rgba(255, 255, 255, 0.15), 0 0 16px rgba(255, 255, 255, 0.08)`,
+            }}
+            title="Start new analysis"
+          >
+            {/* Subtle backlighting */}
+            <div
+              className="absolute inset-0 rounded-lg pointer-events-none"
+              style={{
+                background: `radial-gradient(circle at center, rgba(255, 255, 255, 0.08) 0%, transparent 60%)`,
+              }}
+            />
+            <XIcon className="w-5 h-5 relative z-10" />
+          </motion.button>
+        </div>
       </div>
     </div>
   );

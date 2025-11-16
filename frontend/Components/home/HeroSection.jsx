@@ -44,13 +44,13 @@ export default function HeroSection() {
                 className="relative rounded-full"
                 style={{
                   background: `linear-gradient(135deg, 
-                    #1a1a1a 0%, 
-                    #181818 15%, 
-                    #161616 30%, 
-                    #141414 45%, 
-                    #121212 60%, 
-                    #101010 75%, 
-                    #0e0e0e 90%, 
+                    #0a0a0a 0%, 
+                    #080808 15%, 
+                    #060606 30%, 
+                    #050505 45%, 
+                    #040404 60%, 
+                    #030303 75%, 
+                    #020202 90%, 
                     #000000 100%
                   )`,
                   border: `1px solid rgba(255, 255, 255, 0.2)`,
@@ -164,13 +164,13 @@ export default function HeroSection() {
                 className="relative rounded-full"
                 style={{
                   background: `linear-gradient(135deg, 
-                    #1a1a1a 0%, 
-                    #181818 15%, 
-                    #161616 30%, 
-                    #141414 45%, 
-                    #121212 60%, 
-                    #101010 75%, 
-                    #0e0e0e 90%, 
+                    #0a0a0a 0%, 
+                    #080808 15%, 
+                    #060606 30%, 
+                    #050505 45%, 
+                    #040404 60%, 
+                    #030303 75%, 
+                    #020202 90%, 
                     #000000 100%
                   )`,
                   border: `1px solid rgba(255, 255, 255, 0.2)`,

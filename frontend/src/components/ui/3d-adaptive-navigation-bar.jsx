@@ -96,13 +96,13 @@ export const PillBase = () => {
   // Dark theme colors - black to dark gray gradient
   const darkGradient = `
     linear-gradient(135deg, 
-      #1a1a1a 0%, 
-      #181818 15%, 
-      #161616 30%, 
-      #141414 45%, 
-      #121212 60%, 
-      #101010 75%, 
-      #0e0e0e 90%, 
+      #0a0a0a 0%, 
+      #080808 15%, 
+      #060606 30%, 
+      #050505 45%, 
+      #040404 60%, 
+      #030303 75%, 
+      #020202 90%, 
       #000000 100%
     )
   `
