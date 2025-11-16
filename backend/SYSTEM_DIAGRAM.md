@@ -25,7 +25,7 @@
 │  │                                                                  │  │
 │  │  Configuration:                                                  │  │
 │  │  • UPLOAD_FOLDER = "uploads"                                    │  │
-│  │  • MODEL_PATH = "models/rash_model.pt"                          │  │
+│  │  • MODEL_PATH = "models/swin_best.pt"                            │  │
 │  │  • MAX_FILE_SIZE = 10MB                                         │  │
 │  │  • CLEANUP_MAX_AGE_HOURS = 1                                    │  │
 │  │  • CORS enabled for frontend                                    │  │
@@ -37,15 +37,17 @@
 │  │         Service Initialization (Startup)                          │  │
 │  │                                                                  │  │
 │  │  ┌──────────────────────────┐  ┌──────────────────────────┐   │  │
-│  │  │  YOLOv8 Model Loading     │  │  Gemini API Client       │   │  │
+│  │  │  Swin Transformer Model    │  │  Gemini API Client       │   │  │
+│  │  │  Loading                   │  │                          │   │  │
 │  │  │                          │  │                          │   │  │
-│  │  │  load_yolo_model()       │  │  load_gemini_client()    │   │  │
+│  │  │  load_swin_model()        │  │  load_gemini_client()    │   │  │
 │  │  │         │                │  │         │                │   │  │
 │  │  │         ├─► Missing?    │  │         ├─► API Key?     │   │  │
 │  │  │         │   Mock Mode   │  │         │   Available    │   │  │
 │  │  │         │                │  │         │                │   │  │
 │  │  │         └─► Loaded?      │  │         └─► Ready        │   │  │
-│  │  │            Real Mode     │  │            gemini-pro    │   │  │
+│  │  │            Real Mode     │  │            gemini-2.0-    │   │  │
+│  │  │            (216 classes) │  │            flash-001      │   │  │
 │  │  └──────────────────────────┘  └──────────────────────────┘   │  │
 │  └─────────────────────────────────────────────────────────────────┘  │
 │                                                                         │
@@ -109,9 +111,21 @@
                              │
                              ▼
                    ┌───────────────────┐
-                   │ 3. Run Detection  │
+                   │ 3. Validate Image  │
+                   │    Quality         │
+                   │    • Size check    │
+                   │    • Blur check    │
+                   │    (Laplacian var) │
+                   └─────────┬─────────┘
+                             │
+                             ├─► Invalid ──► Return 400 Error
+                             │
+                             ▼ Valid
+                   ┌───────────────────┐
+                   │ 4. Run            │
+                   │    Classification │
                    │                    │
-                   │    detect_rash()  │
+                   │    classify_image()│
                    │         │         │
                    │         ├─► Model │
                    │         │  Loaded?│
@@ -119,29 +133,40 @@
                    │         ├─► NO ──►│
                    │         │         │
                    │         │  _mock_ │
-                   │         │  detection()│
+                   │         │  classification()│
                    │         │         │
                    │         └─► YES ──►│
                    │                    │
-                   │         _yolo_model│
-                   │         .predict() │
+                   │         Preprocess │
+                   │         • Resize   │
+                   │         • Normalize│
                    │                    │
-                   │         _parse_yolo│
-                   │         _results() │
+                   │         TTA?       │
+                   │         (optional)  │
+                   │         • 10 augs  │
+                   │                    │
+                   │         _swin_model│
+                   │         (forward)   │
+                   │                    │
+                   │         Softmax    │
+                   │         Top-K      │
                    └─────────┬─────────┘
                              │
                              ▼
                    ┌───────────────────┐
-                   │ 4. Get Detection  │
+                   │ 5. Get Predictions│
                    │    Results        │
-                   │    • rash_label   │
-                   │    • confidence   │
-                   │    • bounding_box │
+                   │    • predictions[]│
+                   │      - condition   │
+                   │      - confidence  │
+                   │    • primary_     │
+                   │      condition     │
+                   │    • top_k (5)     │
                    └─────────┬─────────┘
                              │
                              ▼
                    ┌───────────────────┐
-                   │ 5. Call Gemini    │
+                   │ 6. Call Gemini    │
                    │    API            │
                    │                    │
                    │    generate_      │
@@ -149,6 +174,8 @@
                    │         │         │
                    │         ├─► Format │
                    │         │  prompt │
+                   │         │  (with  │
+                   │         │  predictions)│
                    │         │         │
                    │         ├─► Send  │
                    │         │  to    │
@@ -160,13 +187,15 @@
                              │
                              ▼
                    ┌───────────────────┐
-                   │ 6. Combine &      │
+                   │ 7. Combine &      │
                    │    Return JSON    │
                    │    • success      │
-                   │    • detections[] │
-                   │    • rash_label   │
+                   │    • predictions[] │
+                   │      - condition   │
+                   │      - confidence  │
+                   │    • primary_     │
+                   │      condition     │
                    │    • confidence   │
-                   │    • bounding_box │
                    │    • ai_explanation│
                    │    • explanation_ │
                    │      available    │
@@ -204,52 +233,76 @@
 
 ---
 
-### **2. YOLOv8 Service (services/yolo_service.py)**
+### **2. Swin Transformer Service (services/swin_service.py)**
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│              YOLOv8 Service Module                      │
+│          Swin Transformer Service Module                 │
 ├─────────────────────────────────────────────────────────┤
 │                                                         │
 │  Global State:                                          │
-│  • _yolo_model (YOLO instance)                         │
+│  • _swin_model (timm model instance)                    │
 │  • _model_loaded (bool)                                 │
 │  • _model_path (str)                                    │
+│  • _device (torch.device)                               │
+│  • CLASS_NAMES (list of 216 conditions)                 │
 │                                                         │
 │  Functions:                                             │
 │  ┌─────────────────────────────────────┐              │
-│  │ load_yolo_model(path)                │              │
+│  │ load_swin_model(path)               │              │
 │  │   ├─► Check file exists              │              │
-│  │   ├─► Load YOLO(model_path)         │              │
-│  │   ├─► Extract class names           │              │
-│  │   └─► Set global state               │              │
+│  │   ├─► Load checkpoint                │              │
+│  │   ├─► Detect num_classes             │              │
+│  │   ├─► Create timm model              │              │
+│  │   │   (swinv2_small_window16_256)    │              │
+│  │   ├─► Load state dict                 │              │
+│  │   ├─► Load class names                │              │
+│  │   └─► Set global state                │              │
 │  └─────────────────────────────────────┘              │
 │                                                         │
 │  ┌─────────────────────────────────────┐              │
-│  │ detect_rash(image_path)             │              │
+│  │ classify_image(image_path, top_k,   │              │
+│  │                use_tta)              │              │
 │  │   ├─► Check model loaded?           │              │
-│  │   │   ├─► NO ──► _mock_detection()  │              │
-│  │   │   └─► YES ──► Run YOLO predict  │              │
-│  │   │              └─► _parse_results │              │
-│  │   └─► Return formatted results      │              │
+│  │   │   ├─► NO ──► _mock_classification()│            │
+│  │   │   └─► YES ──► Continue           │              │
+│  │   ├─► Load & validate image          │              │
+│  │   │   ├─► Check size (>50x50)        │              │
+│  │   │   └─► Check blur (Laplacian)     │              │
+│  │   ├─► Preprocess image               │              │
+│  │   │   ├─► Resize (256x256)           │              │
+│  │   │   └─► Normalize                  │              │
+│  │   ├─► TTA? (if use_tta=True)        │              │
+│  │   │   ├─► 10 augmentations           │              │
+│  │   │   └─► Average predictions        │              │
+│  │   ├─► Run model forward pass         │              │
+│  │   ├─► Softmax                         │              │
+│  │   ├─► Top-K predictions              │              │
+│  │   └─► Return formatted results       │              │
 │  └─────────────────────────────────────┘              │
 │                                                         │
 │  ┌─────────────────────────────────────┐              │
-│  │ _parse_yolo_results(results)        │              │
-│  │   ├─► Extract boxes, conf, classes  │              │
-│  │   ├─► Convert xyxy → x,y,w,h        │              │
-│  │   ├─► Filter by confidence          │              │
-│  │   └─► Sort by confidence            │              │
+│  │ get_image_transform()               │              │
+│  │   └─► Return preprocessing pipeline  │              │
+│  │       (Resize, ToTensor, Normalize)  │              │
 │  └─────────────────────────────────────┘              │
 │                                                         │
 │  ┌─────────────────────────────────────┐              │
-│  │ _mock_detection(image_path)          │              │
-│  │   └─► Return placeholder data       │              │
+│  │ get_tta_transforms()                │              │
+│  │   └─► Return 10 augmentation        │              │
+│  │       pipelines                      │              │
+│  └─────────────────────────────────────┘              │
+│                                                         │
+│  ┌─────────────────────────────────────┐              │
+│  │ _mock_classification(image_path)     │              │
+│  │   └─► Return top 5 mock predictions │              │
+│  │       (realistic condition names)    │              │
 │  └─────────────────────────────────────┘              │
 │                                                         │
 │  ┌─────────────────────────────────────┐              │
 │  │ get_model_info()                     │              │
 │  │   └─► Return model status           │              │
+│  │       (loaded, path, device, classes)│              │
 │  └─────────────────────────────────────┘              │
 │                                                         │
 └─────────────────────────────────────────────────────────┘
@@ -426,8 +479,20 @@ Frontend
          │
          ▼ Exists
 ┌─────────────────┐
-│ Call detect_rash│
-│ (image_path)    │
+│ Validate Image  │
+│ Quality         │
+│ • Size check    │
+│ • Blur check    │
+└────────┬────────┘
+         │
+         ├─► Invalid ──► Return 400 Error
+         │
+         ▼ Valid
+┌─────────────────┐
+│ Call classify_  │
+│ image()         │
+│ (image_path,    │
+│  top_k=5)       │
 └────────┬────────┘
          │
          ▼
@@ -435,28 +500,47 @@ Frontend
 │ Model Loaded?   │
 └────────┬────────┘
          │
-         ├─► NO ──► Return Mock Detection
+         ├─► NO ──► Return Mock Predictions
          │
          ▼ YES
 ┌─────────────────┐
-│ YOLOv8 Predict  │
-│ • Load image    │
-│ • Run inference │
-│ • Get results   │
+│ Preprocess Image│
+│ • Resize 256x256│
+│ • Normalize     │
 └────────┬────────┘
          │
          ▼
 ┌─────────────────┐
-│ Parse Results   │
-│ • Extract boxes │
-│ • Get confidences│
-│ • Get class IDs │
-│ • Format data   │
+│ Use TTA?        │
+│ (optional)      │
+└────────┬────────┘
+         │
+         ├─► YES ──► 10 Augmentations → Average
+         │
+         └─► NO ──► Single Forward Pass
+         │
+         ▼
+┌─────────────────┐
+│ Swin Transformer│
+│ Forward Pass    │
+│ • Get logits    │
+│ • Softmax        │
+│ • Top-K (5)      │
 └────────┬────────┘
          │
          ▼
 ┌─────────────────┐
-│ Return Detection│
+│ Format Results  │
+│ • predictions[] │
+│ • primary_      │
+│   condition     │
+│ • confidence    │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│ Return          │
+│ Predictions     │
 │ JSON Response   │
 └─────────────────┘
 ```
@@ -483,17 +567,19 @@ Frontend
                              │
                              ▼
 ┌──────────────┐      ┌──────────────┐
-│ /analyze     │─────►│ YOLOv8       │
-│ Endpoint     │      │ Detection    │
+│ /analyze     │─────►│ Swin         │
+│ Endpoint     │      │ Transformer  │
+│              │      │ Classification│
 └──────────────┘      └──────┬───────┘
                              │
-                             │ Results
+                             │ Predictions
+                             │ (Top-K)
                              │
                              ▼
 ┌──────────────┐      ┌──────────────┐
 │ Frontend     │◄─────│ JSON Response│
 │ Displays     │      │ with         │
-│ Results      │      │ detections   │
+│ Results      │      │ predictions[] │
 └──────────────┘      └──────────────┘
 ```
 
@@ -510,7 +596,7 @@ Frontend
                   │
                   ▼
         ┌──────────────────┐
-        │ load_yolo_model()│
+        │ load_swin_model()│
         └────────┬─────────┘
                   │
         ┌─────────┴─────────┐
@@ -522,7 +608,12 @@ Frontend
         │                   │
         ▼                   ▼
 ┌───────────────┐   ┌───────────────┐
-│ Load YOLO()   │   │ Set Mock Mode │
+│ Load Checkpoint│   │ Set Mock Mode │
+│ • Create timm  │   │               │
+│   model        │   │               │
+│ • Load weights │   │               │
+│ • Detect       │   │               │
+│   classes      │   │               │
 └───────┬───────┘   └───────┬───────┘
         │                   │
         ├─► Success         │
@@ -532,6 +623,9 @@ Frontend
 │ Real Mode     │   │ Mock Mode     │
 │ _model_loaded │   │ _model_loaded │
 │ = True        │   │ = False       │
+│ 216 classes   │   │ Top 5 mock    │
+│ Device: CUDA/ │   │ predictions   │
+│ CPU           │   │               │
 └───────────────┘   └───────────────┘
 ```
 
@@ -549,10 +643,16 @@ backend/
 │
 ├── services/
 │   ├── __init__.py
-│   └── yolo_service.py       # YOLOv8 detection logic
-│       ├── Model loading
-│       ├── Detection
-│       └── Result parsing
+│   ├── swin_service.py        # Swin Transformer classification logic
+│   │   ├── Model loading
+│   │   ├── Image preprocessing
+│   │   ├── Classification
+│   │   ├── TTA (Test Time Augmentation)
+│   │   └── Result formatting
+│   └── gemini_service.py      # Gemini API integration
+│       ├── API client
+│       ├── Prompt formatting
+│       └── Explanation generation
 │
 ├── utils/
 │   ├── __init__.py
@@ -561,7 +661,8 @@ backend/
 │       └── File deletion
 │
 ├── models/
-│   └── rash_model.pt         # YOLOv8 model file (when available)
+│   ├── swin_best.pt           # Swin Transformer model (when available)
+│   └── class_mapping.json     # 216 skin condition mappings
 │
 └── uploads/
     ├── .gitkeep
@@ -604,10 +705,10 @@ Request
 - Receives file → Validates → Saves → Cleans up → Returns
 
 ### **2. Analyze Endpoint**
-- Receives filename → Validates path → Calls YOLOv8 → Parses → Returns
+- Receives filename → Validates path → Validates image quality → Calls Swin Transformer → Gets Top-K predictions → Returns
 
 ### **3. Model Service**
-- Checks if loaded → Uses real model OR mock → Returns formatted results
+- Checks if loaded → Uses real model OR mock → Preprocesses image → Runs classification (with optional TTA) → Returns Top-K predictions
 
 ### **4. Cleanup Utility**
 - Scans folder → Checks age → Deletes old files → Returns count
@@ -618,14 +719,15 @@ Request
 
 **Main Components:**
 1. **Flask App** - Handles HTTP requests
-2. **YOLOv8 Service** - Model loading and detection
-3. **File Cleanup** - Manages temporary files
-4. **File System** - Stores models and uploads
+2. **Swin Transformer Service** - Model loading and classification (216 classes)
+3. **Gemini Service** - AI explanation generation
+4. **File Cleanup** - Manages temporary files
+5. **File System** - Stores models and uploads
 
 **Key Flows:**
 1. **Upload Flow** - File → Validation → Save → Cleanup → Response
-2. **Analysis Flow** - Filename → Path → YOLOv8 → Parse → Response
-3. **Model Loading** - Startup → Check → Load → Set State
+2. **Analysis Flow** - Filename → Path → Quality Check → Swin Classification → Top-K Predictions → Gemini Explanation → Response
+3. **Model Loading** - Startup → Check → Load Checkpoint → Create Model → Load Weights → Set State
 
 **State Management:**
 - Model loaded state (global)
@@ -634,139 +736,32 @@ Request
 
 ---
 
-## Pending Implementation (Not Yet Built)
+## Migration: YOLOv8 → Swin Transformer ✅
 
-### Phase 4: Gemini API Integration ⏳
+### **Completed Migration**
 
-```
-┌─────────────────────────────────────────────────────────┐
-│         CURRENT: Analysis Returns YOLOv8 Results        │
-└──────────────────────┬──────────────────────────────────┘
-                       │
-                       ▼
-┌─────────────────────────────────────────────────────────┐
-│              TO BE IMPLEMENTED                          │
-│                                                         │
-│  ┌─────────────────────────────────────┐              │
-│  │ services/gemini_service.py           │              │
-│  │                                      │              │
-│  │ Functions Needed:                    │              │
-│  │ • get_explanation(yolo_results)      │              │
-│  │ • format_prompt_for_gemini()         │              │
-│  │ • call_gemini_api(prompt)            │              │
-│  │ • parse_gemini_response()            │              │
-│  └──────────────────┬───────────────────┘              │
-│                     │                                   │
-│                     ▼                                   │
-│  ┌─────────────────────────────────────┐              │
-│  │ Gemini API Integration              │              │
-│  │                                      │              │
-│  │ Input:                               │              │
-│  │ • Rash label (from YOLOv8)          │              │
-│  │ • Confidence score                   │              │
-│  │ • Request for explanation            │              │
-│  │                                      │              │
-│  │ Process:                             │              │
-│  │ • Format prompt                      │              │
-│  │ • Send to Gemini API                │              │
-│  │ • Handle API errors                 │              │
-│  │ • Parse response                     │              │
-│  │                                      │              │
-│  │ Output:                              │              │
-│  │ • AI-generated explanation          │              │
-│  │ • Context about condition           │              │
-│  │ • Recommendations                   │              │
-│  └─────────────────────────────────────┘              │
-│                                                         │
-└─────────────────────────────────────────────────────────┘
-```
+The system has been successfully migrated from YOLOv8 object detection to Swin Transformer image classification:
 
-**Missing Components:**
-- `services/gemini_service.py` - Gemini API client
-- Environment variable for API key (`.env` file)
-- Prompt formatting logic
-- Error handling for API failures
-- Response parsing
+**Key Changes:**
+- ✅ Model architecture: YOLOv8 → Swin Transformer (Vision Transformer)
+- ✅ Model file: `rash_model.pt` → `swin_best.pt`
+- ✅ Service: `yolo_service.py` → `swin_service.py`
+- ✅ Output format: Detections with bounding boxes → Top-K predictions
+- ✅ Classes: ~5-10 conditions → 216 skin conditions
+- ✅ New features: TTA (Test Time Augmentation), image quality validation
+- ✅ Library: Ultralytics → timm (PyTorch Image Models)
 
-**Expected Flow:**
-```
-YOLOv8 Detection → Format Results → Gemini API → Parse Response → Return Combined
-```
+**Response Format Changes:**
+- Removed: `bounding_box` coordinates
+- Changed: `detections[]` → `predictions[]`
+- Changed: `rash_label` → `primary_condition`
+- Added: Top-K predictions array (default: 5)
 
----
-
-### Phase 5: End-to-End Integration ⏳
-
-```
-┌─────────────────────────────────────────────────────────┐
-│         CURRENT: Separate Upload & Analyze              │
-└──────────────────────┬──────────────────────────────────┘
-                       │
-                       ▼
-┌─────────────────────────────────────────────────────────┐
-│              TO BE IMPLEMENTED                          │
-│                                                         │
-│  Complete Workflow:                                      │
-│                                                         │
-│  ┌─────────────────────────────────────┐              │
-│  │ POST /upload                        │              │
-│  │   │                                 │              │
-│  │   ├─► Save Image                   │              │
-│  │   │                                 │              │
-│  │   ├─► Run YOLOv8 Detection         │              │
-│  │   │   └─► Get rash label,          │              │
-│  │   │       confidence, bbox         │              │
-│  │   │                                 │              │
-│  │   ├─► Send to Gemini API          │              │
-│  │   │   └─► Get explanation          │              │
-│  │   │                                 │              │
-│  │   ├─► Combine All Results          │              │
-│  │   │                                 │              │
-│  │   └─► Return Single JSON Response  │              │
-│  │       {                             │              │
-│  │         "rash_label": "...",        │              │
-│  │         "confidence": 85.5,        │              │
-│  │         "bounding_box": {...},      │              │
-│  │         "ai_explanation": "..."    │              │
-│  │       }                             │              │
-│  └─────────────────────────────────────┘              │
-│                                                         │
-│  OR                                                     │
-│                                                         │
-│  ┌─────────────────────────────────────┐              │
-│  │ Enhanced POST /analyze              │              │
-│  │   │                                 │              │
-│  │   ├─► YOLOv8 Detection             │              │
-│  │   ├─► Gemini Explanation            │              │
-│  │   └─► Combined Response            │              │
-│  └─────────────────────────────────────┘              │
-│                                                         │
-└─────────────────────────────────────────────────────────┘
-```
-
-**Missing Components:**
-- Integration of Gemini service into analyze endpoint
-- Combined response format
-- Error handling for partial failures (YOLO works, Gemini fails)
-- File cleanup after analysis completion
-
-**Expected Response Format:**
-```json
-{
-  "success": true,
-  "rash_label": "eczema",
-  "confidence": 85.5,
-  "bounding_box": {
-    "x": 100,
-    "y": 150,
-    "width": 200,
-    "height": 180
-  },
-  "ai_explanation": "Eczema is a common skin condition...",
-  "recommendations": ["Keep skin moisturized", "Avoid triggers"],
-  "model_loaded": true
-}
-```
+**New Capabilities:**
+- Image quality validation (blur detection, size checks)
+- Test Time Augmentation for improved accuracy
+- Support for 216 different skin conditions
+- Dynamic class detection from model checkpoint
 
 ---
 
@@ -854,9 +849,9 @@ YOLOv8 Detection → Format Results → Gemini API → Parse Response → Return
 - [x] Image upload endpoint (`POST /upload`)
 - [x] File validation (extension, size, content type)
 - [x] File cleanup utility
-- [x] YOLOv8 service structure
+- [x] Swin Transformer service structure
 - [x] Model loading (with mock mode)
-- [x] Mock detection with top 3 conditions
+- [x] Mock classification with top 5 conditions
 - [x] Analysis endpoint (`POST /analyze`)
 - [x] Model info endpoint (`GET /model/info`)
 - [x] Cleanup endpoint (`POST /cleanup`)
@@ -867,7 +862,7 @@ YOLOv8 Detection → Format Results → Gemini API → Parse Response → Return
 **Phase 4: Gemini API Integration** ✅
 - [x] Create `services/gemini_service.py`
 - [x] Set up Gemini API client
-- [x] Format YOLOv8 results for Gemini prompt (supports top 3 detections)
+- [x] Format Swin Transformer predictions for Gemini prompt (supports top-K predictions)
 - [x] Format prompt with user context prominently featured
 - [x] Call Gemini API
 - [x] Parse Gemini response
@@ -875,15 +870,18 @@ YOLOv8 Detection → Format Results → Gemini API → Parse Response → Return
 - [x] Add API key support via `.env`
 - [x] Optimized prompt for faster responses
 - [x] Generation config for performance
+- [x] Chat follow-up endpoint (`POST /chat`)
 
 **Phase 5: End-to-End Integration** ✅
 - [x] Integrate Gemini into analyze endpoint
-- [x] Combine YOLOv8 + Gemini results
-- [x] Update response format (includes all detections + explanation)
-- [x] Handle partial failures (returns YOLOv8 results even if Gemini fails)
+- [x] Combine Swin Transformer + Gemini results
+- [x] Update response format (includes all predictions + explanation)
+- [x] Handle partial failures (returns predictions even if Gemini fails)
 - [x] Frontend-backend connection
 - [x] User context integration (image + text description)
-- [x] Top 3 detections support
+- [x] Top-K predictions support (default: 5)
+- [x] Image quality validation (blur detection, size checks)
+- [x] Test Time Augmentation (TTA) support
 - [x] Performance timing logs
 - [x] Test complete workflow
 
@@ -943,29 +941,42 @@ POST /upload (Frontend → Backend)
 POST /analyze (Frontend → Backend)
    │ Body: {filename: "rash_XXX.png"}
    │
-   ├─► Run YOLOv8 Detection
-   │   ├─► Model loaded? → Real detection
-   │   └─► Model missing? → Mock detection
-   │   └─► Returns: {rash_label, confidence, bounding_box}
+   ├─► Validate Image Quality
+   │   ├─► Size check (>50x50 pixels)
+   │   └─► Blur check (Laplacian variance)
+   │
+   ├─► Run Swin Transformer Classification
+   │   ├─► Model loaded? → Real classification
+   │   └─► Model missing? → Mock classification
+   │   ├─► Preprocess image (resize, normalize)
+   │   ├─► Optional: TTA (10 augmentations)
+   │   ├─► Forward pass through model
+   │   ├─► Softmax + Top-K (default: 5)
+   │   └─► Returns: {predictions[], primary_condition, confidence}
    │
    ├─► Call Gemini API
-   │   ├─► Format prompt with detection results
+   │   ├─► Format prompt with prediction results
+   │   ├─► Include user context (if provided)
    │   ├─► Send to Gemini API
    │   └─► Returns: {ai_explanation: "..."}
    │
    ├─► Combine All Results
-   │   └─► Merge YOLOv8 + Gemini data
+   │   └─► Merge Swin predictions + Gemini explanation
    │
    └─► Return Complete JSON:
        {
          "success": true,
-         "rash_label": "eczema",
+         "predictions": [
+           {"condition": "atopic_dermatitis", "confidence": 85.5},
+           {"condition": "melanocytic_nevus", "confidence": 72.3},
+           ...
+         ],
+         "primary_condition": "atopic_dermatitis",
          "confidence": 85.5,
-         "bounding_box": {...},
          "ai_explanation": "Full Gemini explanation...",
          "explanation_available": true,
-         "detections": [...],
-         "mock": true
+         "model_loaded": true,
+         "mock": false
        }
    │
    ▼
@@ -982,8 +993,9 @@ Frontend Receives Response
 
 ## Missing Endpoints (Future)
 
-### **Enhanced Analyze Endpoint**
-- `POST /analyze` - Will include Gemini explanation in response
+### **Enhanced Analyze Endpoint** ✅
+- `POST /analyze` - Includes Swin Transformer predictions + Gemini explanation
+- `POST /chat` - Follow-up chat with Gemini (context-aware)
 
 ### **Potential New Endpoints**
 - `GET /api/docs` - API documentation (Swagger)
@@ -996,8 +1008,14 @@ Frontend Receives Response
 
 ### **For Gemini Integration:**
 - ✅ `google-generativeai` - Already in requirements.txt
-- ⏳ Gemini API key - Need to obtain
-- ⏳ `.env` file - Need to create
+- ✅ Gemini API integration - Implemented
+- ✅ `.env` file support - Implemented via python-dotenv
+
+### **For Swin Transformer:**
+- ✅ `timm` - PyTorch Image Models library
+- ✅ `torch` - PyTorch framework
+- ✅ `torchvision` - Image transforms
+- ✅ `opencv-python` - Image quality validation
 
 ### **For Production:**
 - ⏳ `gunicorn` - Production server
@@ -1010,16 +1028,19 @@ Frontend Receives Response
 ## Next Steps Priority
 
 1. **High Priority:**
-   - Gemini API integration (Phase 4)
-   - End-to-end workflow (Phase 5)
+   - ✅ Gemini API integration (Phase 4) - **COMPLETED**
+   - ✅ End-to-end workflow (Phase 5) - **COMPLETED**
+   - ✅ Swin Transformer migration - **COMPLETED**
 
 2. **Medium Priority:**
    - Configuration management
    - Logging system
+   - Update frontend for new response format
 
 3. **Low Priority:**
    - Rate limiting
-   - API documentation
+   - API documentation updates
    - Unit tests
    - Production deployment
+   - Remove unused Ultralytics dependencies
 
