@@ -10,6 +10,11 @@ from services.yolo_service import (
     is_model_loaded,
     get_model_info,
 )
+from services.gemini_service import (
+    load_gemini_client,
+    is_gemini_available,
+    generate_explanation,
+)
 
 # Create Flask application instance
 app = Flask(__name__)
@@ -41,6 +46,17 @@ if model_loaded:
     print("✅ YOLOv8 model ready!")
 else:
     print("⚠️  YOLOv8 model not found - using mock mode")
+print("=" * 60 + "\n")
+
+# Load Gemini API client on startup
+print("=" * 60)
+print("🧠 Loading Gemini API Client")
+print("=" * 60)
+gemini_loaded = load_gemini_client()
+if gemini_loaded:
+    print("✅ Gemini API client ready!")
+else:
+    print("⚠️  Gemini API not configured - AI explanations unavailable")
 print("=" * 60 + "\n")
 
 
@@ -203,18 +219,37 @@ def cleanup_files():
 @app.route("/analyze", methods=["POST"])
 def analyze_image():
     """
-    Analyze an uploaded image using YOLOv8 to detect skin rashes.
+    Analyze an uploaded image using YOLOv8 to detect skin rashes,
+    then generate AI explanation using Gemini API.
     Requires 'image_path' or 'filename' in request body.
+
+    Returns combined YOLOv8 detection results and Gemini AI explanation.
     """
     try:
-        # Get image path from request
+        # Get image path and user context from request
         data = request.get_json() or {}
         image_path = data.get("image_path") or data.get("path")
         filename = data.get("filename")
+        user_context = (
+            data.get("user_context")
+            or data.get("user_description")
+            or data.get("description")
+            or ""
+        )
 
         # If filename provided, construct full path
         if filename and not image_path:
-            image_path = os.path.join(UPLOAD_FOLDER, filename)
+            # Try uploads folder first, then test_images folder
+            potential_path = os.path.join(UPLOAD_FOLDER, filename)
+            if os.path.exists(potential_path):
+                image_path = potential_path
+            else:
+                # Try test_images folder as fallback
+                test_images_path = os.path.join("test_images", filename)
+                if os.path.exists(test_images_path):
+                    image_path = test_images_path
+                else:
+                    image_path = potential_path  # Will fail validation below
 
         # Validate image path
         if not image_path:
@@ -245,18 +280,85 @@ def analyze_image():
                 500,
             )
 
-        # Return detection results
-        return (
-            jsonify(
-                {
-                    "success": True,
-                    "detections": detection_result["detections"],
-                    "model_loaded": is_model_loaded(),
-                    "mock": detection_result.get("mock", False),
-                }
+        detections = detection_result["detections"]
+
+        # If no detections found, return early
+        if not detections or len(detections) == 0:
+            return (
+                jsonify(
+                    {
+                        "success": True,
+                        "detections": [],
+                        "rash_label": None,
+                        "confidence": None,
+                        "bounding_box": None,
+                        "ai_explanation": None,
+                        "explanation_available": False,
+                        "model_loaded": is_model_loaded(),
+                        "mock": detection_result.get("mock", False),
+                    }
+                ),
+                200,
+            )
+
+        # Get top detections (up to 3, already sorted by confidence)
+        top_detections = detections[:3]  # Top 3 detections
+        first_detection = detections[0]  # Primary detection (highest confidence)
+
+        import time
+
+        start_time = time.time()
+
+        print(f"\n🔍 Detections found: {len(detections)} total")
+        for i, det in enumerate(top_detections, 1):
+            print(
+                f"   {i}. {det.get('rash_label')} ({det.get('confidence')}% confidence)"
+            )
+        print(f"📤 Sending top {len(top_detections)} detections to Gemini API...")
+
+        detection_time = time.time() - start_time
+        print(f"⏱️  Detection took: {detection_time:.2f}s")
+
+        # Generate AI explanation using Gemini with all top detections and user context
+        if user_context and user_context.strip():
+            print(
+                f"💬 User provided context: \"{user_context[:100]}{'...' if len(user_context) > 100 else ''}\""
+            )
+        gemini_start = time.time()
+        gemini_result = generate_explanation(top_detections, user_context=user_context)
+        gemini_time = time.time() - gemini_start
+
+        if gemini_result["success"]:
+            print(
+                f"✅ Gemini explanation received ({len(gemini_result.get('explanation', ''))} chars) in {gemini_time:.2f}s"
+            )
+        else:
+            print(
+                f"❌ Gemini failed: {gemini_result.get('error')} (took {gemini_time:.2f}s)"
+            )
+
+        total_time = time.time() - start_time
+        print(f"⏱️  Total analysis time: {total_time:.2f}s")
+
+        # Combine YOLOv8 detection results with Gemini explanation
+        response_data = {
+            "success": True,
+            "detections": detections,  # Keep all detections for reference
+            "rash_label": first_detection["rash_label"],
+            "confidence": first_detection["confidence"],
+            "bounding_box": first_detection["bounding_box"],
+            "ai_explanation": (
+                gemini_result.get("explanation") if gemini_result["success"] else None
             ),
-            200,
-        )
+            "explanation_available": gemini_result["success"],
+            "explanation_error": (
+                gemini_result.get("error") if not gemini_result["success"] else None
+            ),
+            "model_loaded": is_model_loaded(),
+            "mock": detection_result.get("mock", False),
+        }
+
+        return jsonify(response_data), 200
 
     except Exception as e:
         return jsonify({"error": f"Analysis error: {str(e)}"}), 500

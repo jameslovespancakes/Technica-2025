@@ -6,11 +6,16 @@
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                         FRONTEND (React/Vite)                           │
 │                      http://localhost:5173                              │
-└──────────────────────────────┬──────────────────────────────────────────┘
-                               │
-                               │ HTTP Requests
-                               │
-                               ▼
+│                                                                         │
+│  ┌─────────────────────────────────────────────────────────────────┐  │
+│  │              Analysis Page (Analysis.jsx)                        │  │
+│  │  • AnimatedAIChat - Image upload interface                      │  │
+│  │  • AnalysisResults - Chat display with Gemini responses         │  │
+│  └─────────────────────────────────────────────────────────────────┘  │
+│                               │                                          │
+│                               │ HTTP Requests                            │
+│                               │ (via base44Client.js)                    │
+│                               ▼                                          │
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                    FLASK BACKEND SERVER                                 │
 │                   http://localhost:5000                                 │
@@ -23,22 +28,25 @@
 │  │  • MODEL_PATH = "models/rash_model.pt"                          │  │
 │  │  • MAX_FILE_SIZE = 10MB                                         │  │
 │  │  • CLEANUP_MAX_AGE_HOURS = 1                                    │  │
+│  │  • CORS enabled for frontend                                    │  │
 │  └─────────────────────────────────────────────────────────────────┘  │
 │                               │                                          │
 │                               │ Startup                                  │
 │                               ▼                                          │
 │  ┌─────────────────────────────────────────────────────────────────┐  │
-│  │              YOLOv8 Model Loading (Startup)                      │  │
+│  │         Service Initialization (Startup)                          │  │
 │  │                                                                  │  │
-│  │  load_yolo_model(MODEL_PATH)                                    │  │
-│  │         │                                                        │  │
-│  │         ├─► Model exists? ──NO──► Mock Mode                     │  │
-│  │         │                                                        │  │
-│  │         └─► YES ──► Load YOLO(model_path)                       │  │
-│  │                    │                                             │  │
-│  │                    ├─► Success ──► Real Detection Mode          │  │
-│  │                    │                                             │  │
-│  │                    └─► Error ──► Mock Mode                      │  │
+│  │  ┌──────────────────────────┐  ┌──────────────────────────┐   │  │
+│  │  │  YOLOv8 Model Loading     │  │  Gemini API Client       │   │  │
+│  │  │                          │  │                          │   │  │
+│  │  │  load_yolo_model()       │  │  load_gemini_client()    │   │  │
+│  │  │         │                │  │         │                │   │  │
+│  │  │         ├─► Missing?    │  │         ├─► API Key?     │   │  │
+│  │  │         │   Mock Mode   │  │         │   Available    │   │  │
+│  │  │         │                │  │         │                │   │  │
+│  │  │         └─► Loaded?      │  │         └─► Ready        │   │  │
+│  │  │            Real Mode     │  │            gemini-pro    │   │  │
+│  │  └──────────────────────────┘  └──────────────────────────┘   │  │
 │  └─────────────────────────────────────────────────────────────────┘  │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -124,9 +132,44 @@
                              │
                              ▼
                    ┌───────────────────┐
-                   │ 4. Return JSON    │
+                   │ 4. Get Detection  │
+                   │    Results        │
+                   │    • rash_label   │
+                   │    • confidence   │
+                   │    • bounding_box │
+                   └─────────┬─────────┘
+                             │
+                             ▼
+                   ┌───────────────────┐
+                   │ 5. Call Gemini    │
+                   │    API            │
+                   │                    │
+                   │    generate_      │
+                   │    explanation()  │
+                   │         │         │
+                   │         ├─► Format │
+                   │         │  prompt │
+                   │         │         │
+                   │         ├─► Send  │
+                   │         │  to    │
+                   │         │  Gemini│
+                   │         │         │
+                   │         └─► Get   │
+                   │             explanation│
+                   └─────────┬─────────┘
+                             │
+                             ▼
+                   ┌───────────────────┐
+                   │ 6. Combine &      │
+                   │    Return JSON    │
                    │    • success      │
                    │    • detections[] │
+                   │    • rash_label   │
+                   │    • confidence   │
+                   │    • bounding_box │
+                   │    • ai_explanation│
+                   │    • explanation_ │
+                   │      available    │
                    │    • model_loaded │
                    │    • mock         │
                    └───────────────────┘
@@ -214,7 +257,55 @@
 
 ---
 
-### **3. File Cleanup Utility (utils/file_cleanup.py)**
+### **3. Gemini Service (services/gemini_service.py)**
+
+```
+┌─────────────────────────────────────────────────────────┐
+│              Gemini Service Module                      │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│  Global State:                                          │
+│  • _gemini_model (GenerativeModel instance)            │
+│  • _gemini_available (bool)                            │
+│                                                         │
+│  Configuration:                                         │
+│  • GEMINI_MODEL = "gemini-2.0-flash-001"               │
+│  • TIMEOUT_SECONDS = 30                                │
+│                                                         │
+│  Functions:                                             │
+│  ┌─────────────────────────────────────┐              │
+│  │ load_gemini_client()                 │              │
+│  │   ├─► Get API key from .env         │              │
+│  │   ├─► Configure genai               │              │
+│  │   ├─► Initialize GenerativeModel    │              │
+│  │   └─► Set global state               │              │
+│  └─────────────────────────────────────┘              │
+│                                                         │
+│  ┌─────────────────────────────────────┐              │
+│  │ generate_explanation(detection)      │              │
+│  │   ├─► Check if available            │              │
+│  │   ├─► Format prompt                 │              │
+│  │   ├─► Call Gemini API               │              │
+│  │   └─► Return explanation text       │              │
+│  └─────────────────────────────────────┘              │
+│                                                         │
+│  ┌─────────────────────────────────────┐              │
+│  │ format_prompt_for_gemini()          │              │
+│  │   └─► Create medical prompt with    │              │
+│  │       detection data                │              │
+│  └─────────────────────────────────────┘              │
+│                                                         │
+│  ┌─────────────────────────────────────┐              │
+│  │ get_gemini_info()                    │              │
+│  │   └─► Return API status             │              │
+│  └─────────────────────────────────────┘              │
+│                                                         │
+└─────────────────────────────────────────────────────────┘
+```
+
+---
+
+### **4. File Cleanup Utility (utils/file_cleanup.py)**
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -755,8 +846,9 @@ YOLOv8 Detection → Format Results → Gemini API → Parse Response → Return
 
 ## Implementation Status
 
-### ✅ Completed (Phase 1-3)
+### ✅ **Completed (Phase 1-5)**
 
+**Phase 1-3: Core Backend Infrastructure**
 - [x] Flask application setup
 - [x] CORS configuration
 - [x] Image upload endpoint (`POST /upload`)
@@ -764,6 +856,7 @@ YOLOv8 Detection → Format Results → Gemini API → Parse Response → Return
 - [x] File cleanup utility
 - [x] YOLOv8 service structure
 - [x] Model loading (with mock mode)
+- [x] Mock detection with top 3 conditions
 - [x] Analysis endpoint (`POST /analyze`)
 - [x] Model info endpoint (`GET /model/info`)
 - [x] Cleanup endpoint (`POST /cleanup`)
@@ -771,66 +864,118 @@ YOLOv8 Detection → Format Results → Gemini API → Parse Response → Return
 - [x] Error handling
 - [x] System documentation
 
-### ⏳ Pending (Phase 4-6)
+**Phase 4: Gemini API Integration** ✅
+- [x] Create `services/gemini_service.py`
+- [x] Set up Gemini API client
+- [x] Format YOLOv8 results for Gemini prompt (supports top 3 detections)
+- [x] Format prompt with user context prominently featured
+- [x] Call Gemini API
+- [x] Parse Gemini response
+- [x] Handle API errors
+- [x] Add API key support via `.env`
+- [x] Optimized prompt for faster responses
+- [x] Generation config for performance
 
-**Phase 4: Gemini API Integration**
-- [ ] Create `services/gemini_service.py`
-- [ ] Set up Gemini API client
-- [ ] Format YOLOv8 results for Gemini prompt
-- [ ] Call Gemini API
-- [ ] Parse Gemini response
-- [ ] Handle API errors
-- [ ] Add API key to `.env`
+**Phase 5: End-to-End Integration** ✅
+- [x] Integrate Gemini into analyze endpoint
+- [x] Combine YOLOv8 + Gemini results
+- [x] Update response format (includes all detections + explanation)
+- [x] Handle partial failures (returns YOLOv8 results even if Gemini fails)
+- [x] Frontend-backend connection
+- [x] User context integration (image + text description)
+- [x] Top 3 detections support
+- [x] Performance timing logs
+- [x] Test complete workflow
 
-**Phase 5: End-to-End Integration**
-- [ ] Integrate Gemini into analyze endpoint
-- [ ] Combine YOLOv8 + Gemini results
-- [ ] Update response format
-- [ ] Handle partial failures
-- [ ] File cleanup after analysis
-- [ ] Test complete workflow
+### ⏳ **Pending (Phase 6: Production Readiness)**
 
-**Phase 6: Production Readiness**
-- [ ] Create `config.py` for configuration
-- [ ] Add `.env` file support
-- [ ] Implement logging system
-- [ ] Add rate limiting
-- [ ] Create API documentation
-- [ ] Write unit tests
-- [ ] Set up production server
-- [ ] Configure CORS for production
-- [ ] Sanitize error messages
+**Configuration & Environment**
+- [ ] Create `config.py` for centralized configuration
+- [x] `.env` file support (already implemented via `python-dotenv`)
+- [ ] Move hardcoded constants to config file
+
+**Logging System**
+- [ ] Implement proper logging system (replace `print` statements)
+- [ ] Request logging middleware
+- [ ] Error logging with stack traces
+- [ ] Performance logging
+- [ ] Log file rotation
+
+**Security & Performance**
+- [ ] Add rate limiting (prevent API abuse)
+- [ ] Sanitize error messages (don't expose internal details)
+- [ ] Input validation enhancements
+- [ ] Request timeout handling
+
+**Documentation**
+- [ ] Create API documentation (Swagger/OpenAPI)
+- [x] Endpoint documentation (`ENDPOINTS_REFERENCE.md`)
+- [ ] Update README.md with setup instructions
+
+**Testing**
+- [ ] Write unit tests for services
+- [ ] Integration tests for endpoints
+- [ ] End-to-end tests
+- [ ] Mock service tests
+
+**Production Deployment**
+- [ ] Set up production server (Gunicorn)
+- [ ] Configure CORS for production (specific origins)
+- [ ] Disable debug mode
+- [ ] Environment-specific configurations
+- [ ] Health check monitoring
+- [ ] Error tracking (optional: Sentry)
 
 ---
 
-## Future System Flow (Complete Implementation)
+## Current End-to-End Flow (✅ Implemented)
 
 ```
-User Uploads Image
+User Uploads Image (Frontend)
    │
    ▼
-POST /upload
+POST /upload (Frontend → Backend)
    │
    ├─► Validate & Save Image
+   │   └─► Returns: {filename: "rash_XXX.png"}
+   │
+   ▼
+POST /analyze (Frontend → Backend)
+   │ Body: {filename: "rash_XXX.png"}
    │
    ├─► Run YOLOv8 Detection
-   │   └─► Get: label, confidence, bbox
+   │   ├─► Model loaded? → Real detection
+   │   └─► Model missing? → Mock detection
+   │   └─► Returns: {rash_label, confidence, bounding_box}
    │
-   ├─► Send to Gemini API
-   │   └─► Get: explanation, recommendations
+   ├─► Call Gemini API
+   │   ├─► Format prompt with detection results
+   │   ├─► Send to Gemini API
+   │   └─► Returns: {ai_explanation: "..."}
    │
    ├─► Combine All Results
-   │
-   ├─► Clean Up Temporary File
+   │   └─► Merge YOLOv8 + Gemini data
    │
    └─► Return Complete JSON:
        {
-         "rash_label": "...",
+         "success": true,
+         "rash_label": "eczema",
          "confidence": 85.5,
          "bounding_box": {...},
-         "ai_explanation": "...",
-         "recommendations": [...]
+         "ai_explanation": "Full Gemini explanation...",
+         "explanation_available": true,
+         "detections": [...],
+         "mock": true
        }
+   │
+   ▼
+Frontend Receives Response
+   │
+   ├─► Transform to frontend format
+   │   └─► condition_name, severity, recommendations
+   │
+   └─► Display in Chat Interface
+       └─► AnalysisResults component shows Gemini explanation
 ```
 
 ---

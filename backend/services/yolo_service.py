@@ -221,28 +221,73 @@ def _parse_yolo_results(results, confidence_threshold: float) -> List[Dict]:
 def _mock_detection(image_path: str) -> Dict:
     """
     Return mock detection results when model is not loaded.
+    Mimics real model behavior by returning top 5 detections with varying confidence levels.
     Used for testing and development.
 
     Args:
         image_path: Path to image (not used in mock)
 
     Returns:
-        dict: Mock detection results
+        dict: Mock detection results with top 5 conditions (sorted by confidence)
     """
+    # Mock top 5 detections with realistic confidence levels
+    # These represent the model's top predictions for the skin condition
+    mock_detections = [
+        {
+            "rash_label": "eczema",
+            "confidence": 85.5,
+            "bounding_box": {
+                "x": 100,
+                "y": 150,
+                "width": 200,
+                "height": 180,
+            },
+        },
+        {
+            "rash_label": "psoriasis",
+            "confidence": 72.3,
+            "bounding_box": {
+                "x": 95,
+                "y": 145,
+                "width": 210,
+                "height": 190,
+            },
+        },
+        {
+            "rash_label": "contact_dermatitis",
+            "confidence": 58.7,
+            "bounding_box": {
+                "x": 105,
+                "y": 155,
+                "width": 195,
+                "height": 175,
+            },
+        },
+        {
+            "rash_label": "atopic_dermatitis",
+            "confidence": 45.2,
+            "bounding_box": {
+                "x": 98,
+                "y": 148,
+                "width": 205,
+                "height": 185,
+            },
+        },
+        {
+            "rash_label": "seborrheic_dermatitis",
+            "confidence": 32.8,
+            "bounding_box": {
+                "x": 102,
+                "y": 152,
+                "width": 198,
+                "height": 178,
+            },
+        },
+    ]
+
     return {
         "success": True,
-        "detections": [
-            {
-                "rash_label": "eczema",
-                "confidence": 85.5,
-                "bounding_box": {
-                    "x": 100,
-                    "y": 150,
-                    "width": 200,
-                    "height": 180,
-                },
-            }
-        ],
+        "detections": mock_detections,  # Top 5 detections sorted by confidence
         "mock": True,  # Flag to indicate this is mock data
     }
 
